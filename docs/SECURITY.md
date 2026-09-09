@@ -210,11 +210,38 @@ operator — is better covered by RLS, audit logging and platform key management
 | `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Enforces HTTPS |
 | `Cross-Origin-Opener-Policy` | `same-origin` | Isolates the browsing context from cross-origin openers |
 | `Cache-Control` on `/assets/*` | `public, max-age=31536000, immutable` | Safe because asset filenames are content-hashed; `index.html` is never cached |
+| `Content-Security-Policy` | see below | Confines what the page may load or connect to |
 
-**Recommended next step:** a `Content-Security-Policy`. It is not shipped in this release because
-Vite's runtime and Tailwind's injected styles need a nonce or hash strategy to avoid breaking the
-build, and shipping a `unsafe-inline` policy would be theatre. A tested CSP restricted to `self`
-plus the Supabase origin is the first item on the post-go-live hardening list.
+### The Content-Security-Policy
+
+```
+default-src 'self'; script-src 'self';
+connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+font-src 'self' https://fonts.gstatic.com;
+img-src 'self' data: blob:;
+frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'
+```
+
+Two clauses deserve justification:
+
+- **`script-src 'self'`** carries the real weight. No inline script, no `eval`, no third-party
+  origin can execute. Combined with the XSS review in section 4, this is the clause that would
+  contain an injection if one were ever introduced.
+- **`'unsafe-inline'` appears in `style-src` only, never `script-src`.** React sets inline
+  `style` attributes and Google Fonts serves an inline-styled stylesheet, so a strict `style-src`
+  would break the UI. Inline *styles* cannot execute code; the risk they carry is limited to
+  presentational defacement, which is a materially different exposure from inline scripts.
+- **`connect-src`** is deliberately narrowed to the Supabase origins, including `wss:` for the
+  realtime messaging channel. A script that somehow did execute could not exfiltrate to an
+  arbitrary host.
+
+`frame-ancestors 'none'` duplicates `X-Frame-Options: DENY` on purpose: the former is the modern
+directive, the latter is honoured by older browsers.
+
+Note that `vercel.json` is JSON and therefore cannot carry comments — an explanatory `comment` key
+inside a header object is rejected by Vercel's schema at import time. This section is where that
+reasoning lives.
 
 ---
 
@@ -442,7 +469,8 @@ Layered, so that no single failure is sufficient:
 In priority order, and none of these is required for the contracted scope:
 
 1. Enable **MFA** in Supabase Auth for `super_admin` and `hospital_admin` accounts (closes T5).
-2. Ship a tested **Content-Security-Policy** (further reduces T7).
+2. Tighten `style-src` by removing `'unsafe-inline'`, which needs either self-hosted fonts or a
+   nonce/hash strategy for React's inline style attributes (further reduces T7).
 3. Configure a **dedicated SMTP provider** for auth email, replacing the rate-limited default sender.
 4. Turn on **Supabase alerting** for failed-login spikes and database growth.
 5. Add a **submit-time PHI pattern check** on the clinical summary if a regulator requires it

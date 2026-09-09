@@ -9,7 +9,6 @@
       "source": "/(.*)",
       "headers": [
         {
-          "comment": "'unsafe-inline' is needed for styles only: Tailwind emits a stylesheet, but Google Fonts and React inline style attributes do not survive a strict style-src. Scripts stay locked to self.",
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; script-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'"
         },
