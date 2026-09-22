@@ -7,6 +7,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { AppToaster } from './components/layout/AppToaster'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { PWAPrompts } from './components/layout/PWAPrompts'
+import { BrandingEffect } from './features/branding/useBranding'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +39,8 @@ export function start(rootElement: HTMLElement): void {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
+            {/* Above AuthProvider: the sign-in screen is branded too. */}
+            <BrandingEffect />
             <AuthProvider>
               <App />
               <AppToaster />

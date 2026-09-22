@@ -193,7 +193,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithOtp = useCallback(async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: false },
+      // An invited colleague has no account yet, so the first code has to be
+      // allowed to create one. Who may do that is enforced server-side by the
+      // before_user_created auth hook, which rejects any address without a
+      // pending staff_invite -- this flag is client-side and cannot be trusted.
+      options: { shouldCreateUser: true },
     })
     if (error) throw new Error(humanizeSupabaseError(error))
   }, [])

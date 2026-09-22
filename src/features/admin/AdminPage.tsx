@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { Building2, ClipboardList, ScrollText, SlidersHorizontal, Users } from 'lucide-react'
+import { Building2, ClipboardList, Palette, ScrollText, SlidersHorizontal, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { Gate } from '@/auth/RequireAuth'
 import { Card, PageHeader, Spinner } from '@/components/ui'
@@ -12,6 +12,7 @@ const DepartmentManager = lazy(() => import('./DepartmentManager'))
 const StaffManager = lazy(() => import('./StaffManager'))
 const ScoringSettings = lazy(() => import('./ScoringSettings'))
 const AuditLogViewer = lazy(() => import('./AuditLogViewer'))
+const AppearanceSettings = lazy(() => import('./AppearanceSettings'))
 
 interface AdminTab {
   to: string
@@ -25,6 +26,7 @@ const TABS: AdminTab[] = [
   { to: '/admin/departments', label: 'Departments', icon: ClipboardList },
   { to: '/admin/staff', label: 'Staff', icon: Users },
   { to: '/admin/scoring', label: 'Scoring', icon: SlidersHorizontal, capability: 'admin:system' },
+  { to: '/admin/appearance', label: 'Appearance', icon: Palette, capability: 'admin:system' },
   { to: '/admin/audit', label: 'Audit log', icon: ScrollText, capability: 'audit:view' },
 ]
 
@@ -100,6 +102,14 @@ export default function AdminPage() {
             element={
               <Gate capability="admin:system" fallback={<NotPermitted />}>
                 <ScoringSettings />
+              </Gate>
+            }
+          />
+          <Route
+            path="appearance"
+            element={
+              <Gate capability="admin:system" fallback={<NotPermitted />}>
+                <AppearanceSettings />
               </Gate>
             }
           />

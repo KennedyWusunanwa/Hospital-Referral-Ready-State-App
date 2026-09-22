@@ -5,6 +5,27 @@
 @layer base {
   :root {
     color-scheme: light;
+
+    /*
+     * Default brand ramp, as space-separated RGB channels so Tailwind's
+     * <alpha-value> works (bg-brand-600/50 and friends). These are the
+     * compiled-in fallback; `applyBrandColor` in src/lib/branding.ts
+     * overwrites them from app_settings once it loads, and the same values
+     * are re-derived for whatever colour an administrator picks.
+     */
+    --brand-50: 238 246 255;
+    --brand-100: 217 234 255;
+    --brand-200: 188 218 255;
+    --brand-300: 142 195 255;
+    --brand-400: 89 161 255;
+    --brand-500: 51 125 255;
+    --brand-600: 27 92 245;
+    --brand-700: 20 73 225;
+    --brand-800: 23 61 182;
+    --brand-900: 25 56 143;
+    --brand-950: 20 36 87;
+    /* Text that sits on a brand-600 surface. */
+    --brand-fg: 255 255 255;
   }
 
   .dark {

@@ -34,7 +34,7 @@ type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 disabled:hover:bg-brand-600',
+    'bg-brand-600 text-brand-fg hover:bg-brand-700 active:bg-brand-800 disabled:hover:bg-brand-600',
   secondary:
     'bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
   ghost:

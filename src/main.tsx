@@ -1,10 +1,14 @@
 import { createRoot } from 'react-dom/client'
 import { initTheme } from './lib/theme'
+import { initBranding } from './lib/branding'
 import './index.css'
 
 // Before the first paint, so the sign-in screen honours the saved preference
 // instead of flashing light and correcting itself after the shell mounts.
 initTheme()
+// Painted from the last known values so the shell does not flash the default
+// blue before app_settings resolves.
+initBranding()
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Root element #root not found')

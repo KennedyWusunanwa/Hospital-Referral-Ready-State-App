@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Building2, Check, Copy, Pencil, PowerOff, RotateCcw, Users } from 'lucide-react'
+import { Building2, Mail, Pencil, PowerOff, RotateCcw, Send, Trash2, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
   ErrorBlock,
   Field,
   LoadingBlock,
+  Input,
   Modal,
   Select,
 } from '@/components/ui'
@@ -27,6 +28,7 @@ import { humanizeSupabaseError } from '@/lib/supabase'
 import { formatDateTime, initials } from '@/lib/utils'
 import type { Department, Profile } from '@/lib/types'
 import { useAdminDepartments, useStaff, useUpdateStaff } from './useAdmin'
+import { useCreateInvite, useRevokeInvite, useStaffInvites } from './useAppSettings'
 
 const ROLE_TONES: Record<UserRole, 'brand' | 'info' | 'success' | 'warning' | 'neutral'> = {
   super_admin: 'warning',
@@ -162,36 +164,44 @@ function EditStaffModal({
 }
 
 function InvitePanel({ hospitalId, hospitalName }: { hospitalId: string; hospitalName: string }) {
+  const { role: currentRole } = useAuth()
+  const invites = useStaffInvites(hospitalId)
+  const departments = useAdminDepartments(hospitalId)
+  const createInvite = useCreateInvite()
+  const revokeInvite = useRevokeInvite()
+
+  const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   const [role, setRole] = useState<UserRole>('shift_in_charge')
-  const [copied, setCopied] = useState(false)
+  const [departmentId, setDepartmentId] = useState<string>('')
 
-  // Role and hospital travel in app_metadata, which GoTrue lets ONLY the service
-  // role write. If they came from user_metadata, anyone could self-assign
-  // super_admin in the signup request itself, so the invite has to go through
-  // the Admin API rather than the dashboard's User Metadata box.
-  const payload = JSON.stringify({
-    email: 'colleague@hospital.org',
-    email_confirm: true,
-    user_metadata: { full_name: 'Full Name' },
-    app_metadata: { role, hospital_id: hospitalId },
-  })
+  // Only a system administrator can mint another one; the RLS policy enforces
+  // the same rule, this just keeps it out of the menu.
+  const roleOptions = USER_ROLES.filter(
+    (option) => option !== 'super_admin' || currentRole === 'super_admin',
+  )
 
-  const command = [
-    'curl -X POST "$SUPABASE_URL/auth/v1/admin/users" \\',
-    '  -H "apikey: $SERVICE_ROLE_KEY" \\',
-    '  -H "Authorization: Bearer $SERVICE_ROLE_KEY" \\',
-    '  -H "Content-Type: application/json" \\',
-    `  -d '${payload}'`,
-  ].join('\n')
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
-  const copy = async () => {
+  const submit = async () => {
+    if (!emailValid) {
+      toast.error('Enter a valid email address.')
+      return
+    }
     try {
-      await navigator.clipboard.writeText(command)
-      setCopied(true)
-      toast.success('Command copied')
-      window.setTimeout(() => setCopied(false), 2000)
-    } catch {
-      toast.error('Your browser blocked the clipboard. Select the text and copy it manually.')
+      await createInvite.mutateAsync({
+        email: email.trim(),
+        full_name: fullName.trim() || null,
+        role,
+        hospital_id: hospitalId,
+        department_id: departmentId || null,
+      })
+      toast.success(`${email.trim()} can now sign in as ${ROLE_LABELS[role]}`)
+      setEmail('')
+      setFullName('')
+      setDepartmentId('')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not create the invitation')
     }
   }
 
@@ -199,72 +209,123 @@ function InvitePanel({ hospitalId, hospitalName }: { hospitalId: string; hospita
     <Card>
       <CardHeader
         title="Invite a colleague"
-        description={`How a new account for ${hospitalName} is created.`}
+        description={`Give someone access to ${hospitalName}.`}
+        action={<Mail className="h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden />}
       />
       <CardBody className="space-y-4">
-        <Alert tone="info" title="This screen cannot create the account itself">
-          Creating a user requires a privileged key that must never reach a browser. An
-          administrator completes the invite in the Supabase dashboard; the steps below produce a
-          profile that is already attached to this hospital.
+        <Alert tone="info" title="How this works">
+          You record the role an email address should get. The person then signs in from the login
+          screen using <span className="font-medium">Email code</span> with that same address, and
+          their account is created with the role and hospital you chose here. No password to share,
+          and no privileged key in the browser.
         </Alert>
 
-        <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700 dark:text-slate-300">
-          <li>
-            Run the command below from a terminal, with{' '}
-            <span className="font-mono text-xs">SUPABASE_URL</span> and{' '}
-            <span className="font-mono text-xs">SERVICE_ROLE_KEY</span> set from the project&rsquo;s
-            API settings. Replace the email and name.
-          </li>
-          <li>
-            The signup trigger reads <span className="font-medium">app_metadata</span> and creates
-            the profile already attached to {hospitalName} with the role you picked.
-          </li>
-          <li>
-            Send them a password-reset link so they can set their own password, then confirm they
-            appear in the staff list on this page.
-          </li>
-        </ol>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Email address" required>
+            {({ id }) => (
+              <Input
+                id={id}
+                type="email"
+                value={email}
+                placeholder="colleague@hospital.org"
+                autoComplete="off"
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Full name" hint="Optional. Used until they edit their own profile.">
+            {({ id }) => (
+              <Input
+                id={id}
+                value={fullName}
+                placeholder="Ama Boateng"
+                onChange={(event) => setFullName(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Role" hint={ROLE_DESCRIPTIONS[role]}>
+            {({ id, describedBy }) => (
+              <Select
+                id={id}
+                aria-describedby={describedBy}
+                value={role}
+                onChange={(event) => setRole(event.target.value as UserRole)}
+              >
+                {roleOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {ROLE_LABELS[option]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Department" hint="Required for a shift in-charge to submit readiness.">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={departmentId}
+                onChange={(event) => setDepartmentId(event.target.value)}
+              >
+                <option value="">No department</option>
+                {(departments.data ?? []).map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </div>
 
-        <Alert tone="warning" title="Do not paste the role into User metadata">
-          The dashboard&rsquo;s <span className="font-medium">User metadata</span> box is writable by
-          the account holder, so a role set there would let anyone grant themselves administrator
-          rights. Only <span className="font-medium">app_metadata</span>, which the service-role key
-          above sets, is trusted. Never run this command anywhere the key could be exposed.
-        </Alert>
-
-        <Field label="Role to grant" hint={ROLE_DESCRIPTIONS[role]}>
-          {({ id, describedBy }) => (
-            <Select
-              id={id}
-              aria-describedby={describedBy}
-              value={role}
-              onChange={(event) => setRole(event.target.value as UserRole)}
-              className="sm:max-w-xs"
-            >
-              {USER_ROLES.filter((option) => option !== 'super_admin').map((option) => (
-                <option key={option} value={option}>
-                  {ROLE_LABELS[option]}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        <div className="flex justify-end">
+          <Button onClick={() => void submit()} loading={createInvite.isPending} disabled={!emailValid}>
+            <Send className="h-4 w-4" aria-hidden />
+            Create invitation
+          </Button>
+        </div>
 
         <div>
-          <div className="flex items-center justify-between gap-2">
-            <p className="field-label">Admin API invite command</p>
-            <Button size="sm" variant="outline" onClick={() => void copy()}>
-              {copied ? (
-                <Check className="h-3.5 w-3.5" aria-hidden />
-              ) : (
-                <Copy className="h-3.5 w-3.5" aria-hidden />
-              )}
-              {copied ? 'Copied' : 'Copy command'}
-            </Button>
-          </div>
-          <pre className="mt-1.5 overflow-x-auto whitespace-pre rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">
-            {command}
-          </pre>
+          <p className="field-label mb-1.5">
+            Pending invitations
+            {invites.data && invites.data.length > 0 ? ` (${invites.data.length})` : ''}
+          </p>
+          {invites.isLoading ? (
+            <LoadingBlock rows={2} />
+          ) : (invites.data ?? []).length === 0 ? (
+            <p className="hint">Nobody is waiting to accept an invitation.</p>
+          ) : (
+            <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+              {(invites.data ?? []).map((invite) => (
+                <li key={invite.id} className="flex flex-wrap items-center gap-3 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {invite.email}
+                    </p>
+                    <p className="hint">
+                      {ROLE_LABELS[invite.role as UserRole] ?? invite.role} &middot; expires{' '}
+                      {formatDateTime(invite.expires_at)}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      revokeInvite.mutate(
+                        { id: invite.id, hospitalId },
+                        {
+                          onSuccess: () => toast.success('Invitation revoked'),
+                          onError: (error) => toast.error(error.message),
+                        },
+                      )
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                    Revoke
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </CardBody>
     </Card>

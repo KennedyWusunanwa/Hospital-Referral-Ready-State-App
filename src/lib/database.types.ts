@@ -431,6 +431,41 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['scoring_config']['Row']>
         Relationships: []
       }
+
+      app_settings: {
+        Row: {
+          id: number
+          brand_color: string
+          logo_url: string | null
+          app_name: string
+          app_tagline: string
+          support_email: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: Partial<Database['public']['Tables']['app_settings']['Row']>
+        Update: Partial<Database['public']['Tables']['app_settings']['Row']>
+        Relationships: []
+      }
+
+      staff_invites: {
+        Row: {
+          id: string
+          email: string
+          full_name: string | null
+          role: string
+          hospital_id: string | null
+          department_id: string | null
+          invited_by: string | null
+          created_at: string
+          expires_at: string
+          accepted_at: string | null
+          accepted_by: string | null
+        }
+        Insert: Partial<Database['public']['Tables']['staff_invites']['Row']> & { email: string }
+        Update: Partial<Database['public']['Tables']['staff_invites']['Row']>
+        Relationships: []
+      }
     }
 
     Views: {

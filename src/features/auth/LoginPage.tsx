@@ -27,7 +27,7 @@ import {
   TabPanel,
   Tabs,
 } from '@/components/ui'
-import { APP_NAME, APP_TAGLINE, SUPPORT_EMAIL } from '@/lib/constants'
+import { useBranding } from '@/features/branding/useBranding'
 import { humanizeSupabaseError } from '@/lib/supabase'
 import { useAuthPageTheme } from './authTheme'
 
@@ -65,6 +65,7 @@ type OtpEmailValues = z.infer<typeof otpEmailSchema>
 type OtpCodeValues = z.infer<typeof otpCodeSchema>
 
 function BrandPanel() {
+  const { appName, appTagline, logoUrl } = useBranding()
   return (
     <aside className="relative hidden overflow-hidden bg-brand-700 lg:flex lg:flex-col lg:justify-between lg:p-12 dark:bg-brand-950">
       <div
@@ -78,12 +79,21 @@ function BrandPanel() {
 
       <div className="relative">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 text-base font-bold text-white ring-1 ring-white/25">
-            {APP_NAME.slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <p className="text-lg font-semibold text-white">{APP_NAME}</p>
-            <p className="text-sm text-brand-100">{APP_TAGLINE}</p>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt=""
+              className="h-11 w-11 rounded-xl bg-white/15 object-contain p-1 ring-1 ring-white/25"
+              aria-hidden
+            />
+          ) : (
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 text-base font-bold text-white ring-1 ring-white/25">
+              {appName.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-lg font-semibold text-white">{appName}</p>
+            <p className="truncate text-sm text-brand-100">{appTagline}</p>
           </div>
         </div>
 
@@ -111,6 +121,7 @@ function BrandPanel() {
 }
 
 export default function LoginPage() {
+  const { appName, appTagline, logoUrl, supportEmail } = useBranding()
   useAuthPageTheme()
 
   const { signInWithPassword, signInWithOtp, verifyOtp, requestPasswordReset } = useAuth()
@@ -236,12 +247,18 @@ export default function LoginPage() {
       <main className="flex min-h-dvh items-center justify-center px-4 py-10 sm:px-6">
         <div className="w-full max-w-md">
           <div className="mb-6 flex items-center gap-3 lg:hidden">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-sm font-bold text-white">
-              {APP_NAME.slice(0, 2).toUpperCase()}
-            </div>
-            <div>
-              <p className="text-base font-semibold text-slate-900 dark:text-slate-50">{APP_NAME}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{APP_TAGLINE}</p>
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="h-10 w-10 rounded-xl object-contain" aria-hidden />
+            ) : (
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-sm font-bold text-brand-fg">
+                {appName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+                {appName}
+              </p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{appTagline}</p>
             </div>
           </div>
 
@@ -459,13 +476,13 @@ export default function LoginPage() {
           </Card>
 
           <p className="mt-5 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
-            {APP_NAME} accounts are created by your hospital administrator - there is no public
+            {appName} accounts are created by your hospital administrator - there is no public
             sign-up. Need access or locked out? Email{' '}
             <a
-              href={`mailto:${SUPPORT_EMAIL}`}
+              href={`mailto:${supportEmail}`}
               className="font-medium text-brand-700 hover:underline dark:text-brand-400"
             >
-              {SUPPORT_EMAIL}
+              {supportEmail}
             </a>
             .
           </p>

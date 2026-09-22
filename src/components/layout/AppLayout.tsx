@@ -17,7 +17,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { Badge, Button, StatusDot } from '@/components/ui'
-import { APP_NAME, APP_TAGLINE, ROLE_LABELS, type Capability } from '@/lib/constants'
+import { ROLE_LABELS, type Capability } from '@/lib/constants'
+import { useBranding } from '@/features/branding/useBranding'
 import { useTheme } from '@/lib/theme'
 import { cn, initials } from '@/lib/utils'
 import {
@@ -124,18 +125,40 @@ function useFocusTrap(ref: RefObject<HTMLElement>, active: boolean, onClose: () 
 // Sidebar pieces
 // ---------------------------------------------------------------------------
 
+/**
+ * Logo and wordmark, from app_settings. Shared by the desktop sidebar and the
+ * mobile drawer so the two cannot drift apart.
+ */
+function BrandIdentity() {
+  const { appName, appTagline, logoUrl } = useBranding()
+  return (
+    <>
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt=""
+          className="h-9 w-9 shrink-0 rounded-lg object-contain"
+          aria-hidden
+        />
+      ) : (
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-brand-fg">
+          {appName.slice(0, 2).toUpperCase()}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+          {appName}
+        </p>
+        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{appTagline}</p>
+      </div>
+    </>
+  )
+}
+
 function Brand() {
   return (
     <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-slate-200 px-4 dark:border-slate-800">
-      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-        {APP_NAME.slice(0, 2).toUpperCase()}
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-          {APP_NAME}
-        </p>
-        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{APP_TAGLINE}</p>
-      </div>
+      <BrandIdentity />
     </div>
   )
 }
@@ -270,15 +293,7 @@ function MobileDrawer({
           short of it.
         */}
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-slate-200 pl-4 pr-2 dark:border-slate-800">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-            {APP_NAME.slice(0, 2).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-              {APP_NAME}
-            </p>
-            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{APP_TAGLINE}</p>
-          </div>
+          <BrandIdentity />
           <button
             type="button"
             aria-label="Close navigation"

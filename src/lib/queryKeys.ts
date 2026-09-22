@@ -63,8 +63,12 @@ export const queryKeys = {
     compliance: (filters: Record<string, unknown>) => ['reports', 'compliance', filters] as const,
   },
 
+  /** Branding is readable by anon, so it sits outside the admin namespace. */
+  appSettings: ['app-settings'] as const,
+
   admin: {
     users: (hospitalId?: string | null) => ['admin', 'users', hospitalId ?? 'all'] as const,
+    invites: (hospitalId?: string | null) => ['admin', 'invites', hospitalId ?? 'all'] as const,
     auditLogs: (filters: Record<string, unknown>) => ['admin', 'audit-logs', filters] as const,
     scoringConfig: ['admin', 'scoring-config'] as const,
   },

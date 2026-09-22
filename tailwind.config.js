@@ -9,19 +9,25 @@ export default {
         xs: '400px',
       },
       colors: {
+        // Driven by CSS variables so a system administrator can restyle the
+        // whole app at runtime. The values are space-separated RGB channels
+        // (see src/index.css) which is what <alpha-value> needs to work.
         brand: {
-          50: '#eef6ff',
-          100: '#d9eaff',
-          200: '#bcdaff',
-          300: '#8ec3ff',
-          400: '#59a1ff',
-          500: '#337dff',
-          600: '#1b5cf5',
-          700: '#1449e1',
-          800: '#173db6',
-          900: '#19388f',
-          950: '#142457',
+          50: 'rgb(var(--brand-50) / <alpha-value>)',
+          100: 'rgb(var(--brand-100) / <alpha-value>)',
+          200: 'rgb(var(--brand-200) / <alpha-value>)',
+          300: 'rgb(var(--brand-300) / <alpha-value>)',
+          400: 'rgb(var(--brand-400) / <alpha-value>)',
+          500: 'rgb(var(--brand-500) / <alpha-value>)',
+          600: 'rgb(var(--brand-600) / <alpha-value>)',
+          700: 'rgb(var(--brand-700) / <alpha-value>)',
+          800: 'rgb(var(--brand-800) / <alpha-value>)',
+          900: 'rgb(var(--brand-900) / <alpha-value>)',
+          950: 'rgb(var(--brand-950) / <alpha-value>)',
         },
+        // Readable text on a brand-600 surface, recomputed whenever the brand
+        // colour changes so a light brand does not leave white-on-yellow.
+        'brand-fg': 'rgb(var(--brand-fg) / <alpha-value>)',
         ready: {
           green: '#16a34a',
           yellow: '#d97706',
