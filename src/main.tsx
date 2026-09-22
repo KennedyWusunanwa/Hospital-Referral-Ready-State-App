@@ -25,7 +25,7 @@ const missing = REQUIRED_ENV.filter((key) => !import.meta.env[key])
  */
 function renderConfigurationRequired(root: HTMLElement, missingKeys: readonly string[]): void {
   createRoot(root).render(
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-slate-950">
+    <div className="flex min-h-dvh items-center justify-center bg-slate-50 p-4 dark:bg-slate-950">
       <main className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
           Configuration required

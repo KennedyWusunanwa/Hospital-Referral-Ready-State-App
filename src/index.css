@@ -14,16 +14,27 @@
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    /* Removes the legacy 300ms tap delay without disabling pinch zoom. */
+    touch-action: manipulation;
   }
 
   body {
     @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Stops the whole page rubber-banding behind the app shell on iOS. */
+    overscroll-behavior-y: none;
   }
 
   /* A visible focus ring is a safety feature on a ward terminal. */
   :focus-visible {
     @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-950;
+  }
+
+  /* Headings and long clinical names should never blow out a narrow column. */
+  h1,
+  h2,
+  h3 {
+    overflow-wrap: break-word;
   }
 
   ::-webkit-scrollbar {
@@ -51,6 +62,64 @@
 
   .hint {
     @apply text-xs text-slate-500 dark:text-slate-400;
+  }
+}
+
+@layer utilities {
+  /* Narrow scrollbar for the sidebar, which sits next to a full-width one. */
+  .scrollbar-slim {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  /* A scrollable panel inside a drawer must not chain its scroll to the page. */
+  .overscroll-none-y {
+    overscroll-behavior-y: contain;
+  }
+
+  /*
+   * WCAG 2.5.5 / Apple HIG / Material all put the minimum comfortable touch
+   * target at 44-48px. Applied to nav rows and icon buttons that would
+   * otherwise be ~36px.
+   */
+  .tap-target {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  /*
+   * Horizontal page gutter that also clears a landscape notch. `max()` matters:
+   * a bare env(safe-area-inset-left) is 0 on every device without a cutout,
+   * which would leave content flush against the edge.
+   */
+  .px-gutter {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  @media (min-width: 640px) {
+    .px-gutter {
+      padding-left: max(1.5rem, env(safe-area-inset-left));
+      padding-right: max(1.5rem, env(safe-area-inset-right));
+    }
+  }
+}
+
+/*
+ * Unlayered and deliberately more specific than `.text-sm`: iOS Safari zooms
+ * the viewport whenever a focused control renders below 16px, which on a phone
+ * throws the user out of the form layout mid-entry. Only on small screens --
+ * the desktop 14px controls are fine and denser.
+ */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 

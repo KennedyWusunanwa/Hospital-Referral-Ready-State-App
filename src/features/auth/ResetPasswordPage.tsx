@@ -60,7 +60,7 @@ function readLinkError(): string | null {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+    <main className="flex min-h-dvh items-center justify-center px-4 py-10 sm:px-6">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-sm font-bold text-white">
@@ -127,7 +127,7 @@ export default function ResetPasswordPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center">
         <Spinner className="h-8 w-8" />
       </div>
     )

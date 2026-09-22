@@ -6,6 +6,7 @@ import App from './App'
 import { AuthProvider } from './auth/AuthProvider'
 import { AppToaster } from './components/layout/AppToaster'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
+import { PWAPrompts } from './components/layout/PWAPrompts'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +41,7 @@ export function start(rootElement: HTMLElement): void {
             <AuthProvider>
               <App />
               <AppToaster />
+              <PWAPrompts />
             </AuthProvider>
           </BrowserRouter>
         </QueryClientProvider>

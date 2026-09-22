@@ -78,7 +78,7 @@ export default function ReferralFormPrintPage() {
   const snapshot = parseScoreSnapshot(referral.score_snapshot)
 
   return (
-    <div className="min-h-screen bg-slate-100 py-6 print:bg-white print:py-0 dark:bg-slate-950">
+    <div className="min-h-dvh bg-slate-100 py-6 print:bg-white print:py-0 dark:bg-slate-950">
       <div className="no-print mx-auto mb-4 flex w-full max-w-[210mm] flex-wrap items-center justify-between gap-2 px-4">
         <Link to={`/referrals/${referralId}`}>
           <Button variant="ghost" size="sm">

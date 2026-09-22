@@ -7,7 +7,7 @@ import type { Capability } from '@/lib/constants'
 
 function FullScreenLoader() {
   return (
-    <div className="flex h-full min-h-screen items-center justify-center">
+    <div className="flex h-full min-h-dvh items-center justify-center">
       <Spinner className="h-8 w-8" />
     </div>
   )
@@ -32,7 +32,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (profileError || !profile) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex min-h-dvh items-center justify-center p-4">
         <Card className="max-w-md p-6">
           <Alert tone="danger" title="Account not ready">
             {profileError ?? 'Your staff profile could not be loaded.'}

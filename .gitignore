@@ -12,3 +12,6 @@ coverage
 *.tsbuildinfo
 supabase/.temp
 supabase/.branches
+
+# Office/Word lock files (e.g. "~$ Documentation.pdf")
+~$*

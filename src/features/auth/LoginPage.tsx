@@ -230,10 +230,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[1.05fr_1fr]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[1.05fr_1fr]">
       <BrandPanel />
 
-      <main className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
+      <main className="flex min-h-dvh items-center justify-center px-4 py-10 sm:px-6">
         <div className="w-full max-w-md">
           <div className="mb-6 flex items-center gap-3 lg:hidden">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-sm font-bold text-white">
