@@ -415,87 +415,88 @@ export function AppLayout() {
         Skip to content
       </a>
 
-      <div className="flex min-h-dvh">
-        {/* Desktop sidebar: its own scroll context, pinned for the viewport. */}
-        <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900 no-print">
-          <Brand />
-          <NavList items={visibleNav} pendingCount={pending.data} />
-          <SidebarFooter />
-        </aside>
+      {/*
+        Fixed rather than sticky. A sticky sidebar only stays put while its
+        containing block is taller than it is, which made it dependent on the
+        rest of the shell; fixed pins it to the viewport unconditionally. The
+        content column is inset by the same width instead.
+      */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900 no-print">
+        <Brand />
+        <NavList items={visibleNav} pendingCount={pending.data} />
+        <SidebarFooter />
+      </aside>
 
-        <MobileDrawer
-          open={drawerOpen}
-          onClose={closeDrawer}
-          items={visibleNav}
-          pendingCount={pending.data}
-        />
+      <MobileDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        items={visibleNav}
+        pendingCount={pending.data}
+      />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 pt-safe-t backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 no-print">
-            <div className="flex h-14 items-center gap-2 px-gutter">
-              {/* Phones reach the full nav through the tab bar's More tab, so
-                  the hamburger is only needed at tablet widths. */}
-              <button
-                type="button"
-                aria-label="Open navigation"
-                aria-haspopup="dialog"
-                aria-expanded={drawerOpen}
-                className="tap-target -ml-2 hidden place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 md:grid lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
-                onClick={() => setDrawerOpen(true)}
-              >
-                <Menu className="h-5 w-5" aria-hidden />
-              </button>
+      <div className="flex min-h-dvh min-w-0 flex-col lg:pl-64 print:pl-0">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 pt-safe-t backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 no-print">
+          <div className="flex h-14 items-center gap-2 px-gutter">
+            {/* Phones reach the full nav through the tab bar's More tab, so
+                the hamburger is only needed at tablet widths. */}
+            <button
+              type="button"
+              aria-label="Open navigation"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen}
+              className="tap-target -ml-2 hidden place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 md:grid lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
+              onClick={() => setDrawerOpen(true)}
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </button>
 
-              <div className="min-w-0 flex-1">
-                {hospital ? (
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-                      {hospital.name}
-                    </span>
-                    {readiness.data && (
-                      <StatusDot
-                        status={readiness.data.status}
-                        label={`${readiness.data.green}/${readiness.data.total} current`}
-                        pulse
-                        className="hidden xs:inline-flex"
-                      />
-                    )}
-                    {!hospital.accepts_referrals && (
-                      <Badge tone="danger" className="hidden sm:inline-flex">
-                        Not accepting referrals
-                      </Badge>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-sm text-slate-500 dark:text-slate-400">All hospitals</span>
-                )}
-              </div>
-
-              <NavLink
-                to="/notifications"
-                className="tap-target relative -mr-2 grid shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                aria-label={
-                  unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
-                }
-              >
-                <Bell className="h-5 w-5" aria-hidden />
-                {unreadCount > 0 && (
-                  <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+            <div className="min-w-0 flex-1">
+              {hospital ? (
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                    {hospital.name}
                   </span>
-                )}
-              </NavLink>
+                  {readiness.data && (
+                    <StatusDot
+                      status={readiness.data.status}
+                      label={`${readiness.data.green}/${readiness.data.total} current`}
+                      pulse
+                      className="hidden xs:inline-flex"
+                    />
+                  )}
+                  {!hospital.accepts_referrals && (
+                    <Badge tone="danger" className="hidden sm:inline-flex">
+                      Not accepting referrals
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                <span className="text-sm text-slate-500 dark:text-slate-400">All hospitals</span>
+              )}
             </div>
-          </header>
 
-          <main
-            id="main-content"
-            tabIndex={-1}
-            className="min-w-0 flex-1 px-gutter pt-4 pb-[calc(4rem+env(safe-area-inset-bottom))] focus:outline-none sm:pt-6 md:pb-6"
-          >
-            <Outlet />
-          </main>
-        </div>
+            <NavLink
+              to="/notifications"
+              className="tap-target relative -mr-2 grid shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            >
+              <Bell className="h-5 w-5" aria-hidden />
+              {unreadCount > 0 && (
+                <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </NavLink>
+          </div>
+        </header>
+
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-w-0 flex-1 px-gutter pt-4 pb-[calc(4rem+env(safe-area-inset-bottom))] focus:outline-none sm:pt-6 md:pb-6"
+        >
+          <Outlet />
+        </main>
       </div>
 
       <BottomNav
