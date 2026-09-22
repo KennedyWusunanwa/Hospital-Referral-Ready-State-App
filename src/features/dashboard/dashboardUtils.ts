@@ -28,9 +28,35 @@ export function greetingFor(now: Date, timeZone: string): string {
   return 'Good evening'
 }
 
+/**
+ * Titles are stripped before picking a first name. Clinical staff overwhelmingly
+ * register as "Dr. Ama Boateng" or "Matron Grace Adjei", and greeting someone as
+ * "Good morning, Dr." reads as a bug to the person it is addressing.
+ */
+const HONORIFICS = new Set([
+  'dr',
+  'drs',
+  'prof',
+  'professor',
+  'mr',
+  'mrs',
+  'ms',
+  'miss',
+  'mx',
+  'sr',
+  'sister',
+  'matron',
+  'nurse',
+  'midwife',
+  'pharm',
+  'rev',
+])
+
 export function firstNameOf(fullName: string | null | undefined): string {
-  const first = (fullName ?? '').trim().split(/\s+/)[0]
-  return first || 'there'
+  const tokens = (fullName ?? '').trim().split(/\s+/).filter(Boolean)
+  const name = tokens.find((token) => !HONORIFICS.has(token.replace(/\.$/, '').toLowerCase()))
+  // A name that is *only* a title still beats greeting an empty string.
+  return name || tokens[0] || 'there'
 }
 
 /** Whole minutes a referral has been waiting for a response. */
