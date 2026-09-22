@@ -38,6 +38,11 @@ create table if not exists public.app_settings (
 
 insert into public.app_settings (id) values (1) on conflict (id) do nothing;
 
+-- Recorded server-side rather than sent by the client, so the attribution
+-- cannot be forged. Separate from the table definition because `create table
+-- if not exists` will not alter a table that already exists.
+alter table public.app_settings alter column updated_by set default auth.uid();
+
 drop trigger if exists set_app_settings_updated_at on public.app_settings;
 create trigger set_app_settings_updated_at
 before update on public.app_settings
@@ -79,6 +84,8 @@ create table if not exists public.staff_invites (
   accepted_at timestamptz,
   accepted_by uuid references public.profiles (id) on delete set null
 );
+
+alter table public.staff_invites alter column invited_by set default auth.uid();
 
 -- One live invite per address. Case-insensitive, because people type their own
 -- email inconsistently and GoTrue lower-cases it before we ever see it.

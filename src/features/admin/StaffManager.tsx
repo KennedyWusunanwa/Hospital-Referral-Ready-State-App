@@ -27,6 +27,7 @@ import {
 import { humanizeSupabaseError } from '@/lib/supabase'
 import { formatDateTime, initials } from '@/lib/utils'
 import type { Department, Profile } from '@/lib/types'
+import { useHospitals } from '@/features/hospitals/useHospitals'
 import { useAdminDepartments, useStaff, useUpdateStaff } from './useAdmin'
 import { useCreateInvite, useRevokeInvite, useStaffInvites } from './useAppSettings'
 
@@ -163,7 +164,13 @@ function EditStaffModal({
   )
 }
 
-function InvitePanel({ hospitalId, hospitalName }: { hospitalId: string; hospitalName: string }) {
+function InvitePanel({
+  hospitalId,
+  hospitalName,
+}: {
+  hospitalId: string | null
+  hospitalName: string | null
+}) {
   const { role: currentRole } = useAuth()
   const invites = useStaffInvites(hospitalId)
   const departments = useAdminDepartments(hospitalId)
@@ -182,10 +189,17 @@ function InvitePanel({ hospitalId, hospitalName }: { hospitalId: string; hospita
   )
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  // Every role except a system administrator is scoped to one facility, so an
+  // invite for them is meaningless without a hospital to attach it to.
+  const needsHospital = role !== 'super_admin' && !hospitalId
 
   const submit = async () => {
     if (!emailValid) {
       toast.error('Enter a valid email address.')
+      return
+    }
+    if (needsHospital) {
+      toast.error('Choose which hospital this person belongs to first.')
       return
     }
     try {
@@ -209,7 +223,9 @@ function InvitePanel({ hospitalId, hospitalName }: { hospitalId: string; hospita
     <Card>
       <CardHeader
         title="Invite a colleague"
-        description={`Give someone access to ${hospitalName}.`}
+        description={
+          hospitalName ? `Give someone access to ${hospitalName}.` : 'Give someone access.'
+        }
         action={<Mail className="h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden />}
       />
       <CardBody className="space-y-4">
@@ -277,8 +293,19 @@ function InvitePanel({ hospitalId, hospitalName }: { hospitalId: string; hospita
           </Field>
         </div>
 
+        {needsHospital && (
+          <Alert tone="warning" title="Pick a hospital first">
+            A {ROLE_LABELS[role]} works at one facility. Choose it above, or invite them as a system
+            administrator instead.
+          </Alert>
+        )}
+
         <div className="flex justify-end">
-          <Button onClick={() => void submit()} loading={createInvite.isPending} disabled={!emailValid}>
+          <Button
+            onClick={() => void submit()}
+            loading={createInvite.isPending}
+            disabled={!emailValid || needsHospital}
+          >
             <Send className="h-4 w-4" aria-hidden />
             Create invitation
           </Button>
@@ -334,7 +361,16 @@ function InvitePanel({ hospitalId, hospitalName }: { hospitalId: string; hospita
 
 export default function StaffManager() {
   const { hospital, profile, role: currentRole, timezone } = useAuth()
-  const hospitalId = hospital?.id ?? null
+  const isSuperAdmin = currentRole === 'super_admin'
+  // A system administrator deliberately belongs to no single facility, so they
+  // choose which one they are administering rather than being locked out.
+  const hospitals = useHospitals({ onlyActive: false })
+  const [pickedHospitalId, setPickedHospitalId] = useState('')
+
+  const hospitalId = hospital?.id ?? (isSuperAdmin ? pickedHospitalId || null : null)
+  const hospitalName =
+    hospital?.name ?? hospitals.data?.find((item) => item.id === hospitalId)?.name ?? null
+
   const staff = useStaff(hospitalId)
   const departments = useAdminDepartments(hospitalId)
   const updateStaff = useUpdateStaff()
@@ -342,7 +378,7 @@ export default function StaffManager() {
   const [editing, setEditing] = useState<Profile | null>(null)
   const [deactivating, setDeactivating] = useState<Profile | null>(null)
 
-  if (!hospital || !hospitalId) {
+  if (!hospital && !isSuperAdmin) {
     return (
       <Card>
         <EmptyState
@@ -375,10 +411,41 @@ export default function StaffManager() {
 
   return (
     <div className="space-y-5">
+      {isSuperAdmin && !hospital && (
+        <Card>
+          <CardBody>
+            <Field
+              label="Hospital"
+              hint="You administer the whole network, so pick the facility to manage. Leave blank to list everyone."
+            >
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={pickedHospitalId}
+                  onChange={(event) => setPickedHospitalId(event.target.value)}
+                  className="sm:max-w-sm"
+                >
+                  <option value="">All hospitals</option>
+                  {(hospitals.data ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <CardHeader
           title="Staff"
-          description={`People with an account at ${hospital.name}.`}
+          description={
+            hospitalName
+              ? `People with an account at ${hospitalName}.`
+              : 'Everyone with an account across the network.'
+          }
           action={
             staff.data ? (
               <Badge tone="neutral">
@@ -469,7 +536,7 @@ export default function StaffManager() {
         )}
       </Card>
 
-      <InvitePanel hospitalId={hospitalId} hospitalName={hospital.name} />
+      <InvitePanel hospitalId={hospitalId} hospitalName={hospitalName} />
 
       {editing && (
         <EditStaffModal
