@@ -202,6 +202,7 @@ area. Components never call `supabase` directly except for one-line audit writes
 | [docs/ACCEPTANCE_TESTS.md](docs/ACCEPTANCE_TESTS.md) | 64 numbered manual test cases with a client sign-off block |
 | [docs/API.md](docs/API.md) | Every RPC — arguments, returns, callers, errors, examples — plus the PostgREST endpoints and realtime channels the client uses |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Every table column by column, the ER diagram, indexes and why each exists, enumerations, retention guidance |
+| [docs/UI_DOCUMENTATION.md](docs/UI_DOCUMENTATION.md) | Every screen: who sees it, what it shows, filters and actions, states, the shell, search, installation, access levels, design system, responsiveness, glossary and address map. `docs/UI Documentation.pdf` is generated from it with `python scripts/build-ui-doc.py` |
 
 ---
 
