@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Gate } from '@/auth/RequireAuth'
+import { ListSkeleton } from '@/components/ui/skeletons'
 import { useAuth, useCurrentHospitalId } from '@/auth/AuthProvider'
 import {
   Button,
@@ -20,7 +21,6 @@ import {
   Field,
   FilterBar,
   Input,
-  LoadingBlock,
   Modal,
   PageHeader,
   SearchInput,
@@ -518,7 +518,7 @@ export default function ReferralListPage() {
       </FilterBar>
 
       {referrals.isLoading ? (
-        <LoadingBlock label="Loading referrals" rows={4} />
+        <ListSkeleton rows={5} />
       ) : referrals.isError ? (
         <ErrorBlock error={referrals.error} onRetry={() => void referrals.refetch()} />
       ) : visible.length === 0 ? (

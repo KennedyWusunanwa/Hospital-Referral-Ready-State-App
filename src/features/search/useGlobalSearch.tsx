@@ -13,6 +13,7 @@ import {
   BarChart3,
   Bell,
   ClipboardCheck,
+  Download,
   Hospital as HospitalIcon,
   Inbox,
   LogOut,
@@ -37,6 +38,7 @@ import {
   ROLE_LABELS,
   type Capability,
 } from '@/lib/constants'
+import { useInstallPrompt } from '@/lib/installPrompt'
 import { useTheme } from '@/lib/theme'
 import { matchRank, matchesQuery } from '@/lib/textMatch'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -243,6 +245,7 @@ export interface GlobalSearchResult {
 export function useGlobalSearch(term: string, open: boolean, revision = 0): GlobalSearchResult {
   const { can, hospital, signOut } = useAuth()
   const { theme, toggle } = useTheme()
+  const installPrompt = useInstallPrompt()
   const query = term.trim()
   const debounced = useDebouncedValue(query, 150)
   const canSeePeople = can('admin:hospital')
@@ -379,6 +382,18 @@ export function useGlobalSearch(term: string, open: boolean, revision = 0): Glob
     }
 
     const actions: SearchItem[] = [
+      ...(installPrompt.canInstall
+        ? [
+            {
+              id: 'action:install',
+              title: 'Install FERN as an app',
+              subtitle: 'Its own window, faster start-up, taskbar or home screen icon',
+              icon: <Download className="h-4 w-4" aria-hidden />,
+              keywords: 'install app pwa desktop windows home screen download',
+              run: () => void installPrompt.install(),
+            } satisfies SearchItem,
+          ]
+        : []),
       {
         id: 'action:theme',
         title: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
@@ -418,6 +433,7 @@ export function useGlobalSearch(term: string, open: boolean, revision = 0): Glob
     toggle,
     signOut,
     revision,
+    installPrompt,
   ])
 
   const loading =

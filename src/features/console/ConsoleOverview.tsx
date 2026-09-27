@@ -397,7 +397,7 @@ export default function ConsoleOverview() {
   if (stats.isPending) {
     return (
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           {[0, 1, 2, 3, 4].map((index) => (
             <Skeleton key={index} className="h-24 w-full" />
           ))}
@@ -436,7 +436,7 @@ export default function ConsoleOverview() {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <Stat
           label="Active hospitals"
           value={data.hospitals.active}

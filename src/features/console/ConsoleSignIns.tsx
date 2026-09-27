@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { TableSkeleton } from '@/components/ui/skeletons'
 import { Download, KeyRound, Search } from 'lucide-react'
 import {
   Avatar,
@@ -12,7 +13,6 @@ import {
   Field,
   FilterBar,
   Input,
-  LoadingBlock,
   Pagination,
   SearchInput,
   Select,
@@ -135,7 +135,7 @@ export default function ConsoleSignIns() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Stat
           label="Sign-ins in range"
           value={events.data ? events.data.total : '…'}
@@ -240,7 +240,7 @@ export default function ConsoleSignIns() {
 
       <Card className="overflow-hidden">
         {events.isPending ? (
-          <LoadingBlock label="Loading sign-ins" rows={6} />
+          <TableSkeleton />
         ) : events.isError ? (
           <div className="p-5">
             <ErrorBlock error={events.error} onRetry={() => void events.refetch()} />
@@ -260,7 +260,7 @@ export default function ConsoleSignIns() {
           />
         ) : (
           <>
-            <Table minWidth="60rem">
+            <Table responsive minWidth="60rem">
               <thead>
                 <tr>
                   <Th>When</Th>
@@ -290,7 +290,7 @@ export default function ConsoleSignIns() {
                         </span>
                         <span className="hint tabular-nums">{formatDateTime(row.created_at)}</span>
                       </Td>
-                      <Td>
+                      <Td cell="identity">
                         <div className="flex items-center gap-2.5">
                           <Avatar name={name ?? row.email} size="sm" />
                           <div className="min-w-0">

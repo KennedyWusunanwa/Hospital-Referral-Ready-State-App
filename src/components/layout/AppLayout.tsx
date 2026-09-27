@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useIsFetching, useIsMutating } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   Activity,
   BarChart3,
   Bell,
   ClipboardCheck,
+  Download,
   Hospital as HospitalIcon,
   Inbox,
   LogOut,
@@ -20,11 +23,20 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { BrandLogo } from '@/components/brand/BrandLogo'
-import { Avatar, Badge, IconButton, Kbd, SegmentedControl, StatusDot } from '@/components/ui'
+import {
+  Avatar,
+  Badge,
+  Button,
+  IconButton,
+  Kbd,
+  SegmentedControl,
+  StatusDot,
+} from '@/components/ui'
 import { ROLE_LABELS, ROLE_TIER_LABELS, ROLE_TIER_OF, type Capability } from '@/lib/constants'
 import { useBranding } from '@/features/branding/useBranding'
 import { HospitalLogo } from '@/features/hospitals/HospitalLogo'
 import { CommandPalette, isApplePlatform } from '@/features/search/CommandPalette'
+import { useInstallPrompt } from '@/lib/installPrompt'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
@@ -180,6 +192,64 @@ function useSearchShortcut(open: () => void): void {
 }
 
 // ---------------------------------------------------------------------------
+// Global activity
+// ---------------------------------------------------------------------------
+
+/**
+ * A thin bar under the top edge while a screen is waiting on its first data or
+ * a save is in flight. Background refreshes do not show it: a poll every
+ * minute must not make the app look permanently busy.
+ */
+function GlobalLoadingBar() {
+  const fetching = useIsFetching({ predicate: (query) => query.state.status === 'pending' })
+  const mutating = useIsMutating()
+  const busy = fetching + mutating > 0
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (!busy) {
+      setVisible(false)
+      return
+    }
+    // Anything that answers within a beat needs no indicator at all.
+    const timer = window.setTimeout(() => setVisible(true), 250)
+    return () => window.clearTimeout(timer)
+  }, [busy])
+
+  if (!visible) return null
+
+  return (
+    <div
+      role="progressbar"
+      aria-label="Loading"
+      aria-valuetext="Loading"
+      className="pointer-events-none fixed inset-x-0 z-[45] h-0.5 overflow-hidden bg-brand-100/70 no-print dark:bg-brand-950/70"
+      style={{ top: 'var(--titlebar-h, 0px)' }}
+    >
+      <div className="h-full w-1/4 rounded-full bg-brand-600 animate-loading-bar dark:bg-brand-400" />
+    </div>
+  )
+}
+
+/**
+ * The strip the installed desktop app draws inside the window's title bar
+ * (window-controls-overlay). Hidden everywhere else by CSS.
+ */
+function WindowTitleBar({ hospitalName }: { hospitalName: string | null }) {
+  const { appName } = useBranding()
+  return (
+    <div
+      className="wco-titlebar items-center gap-2 border-b border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 select-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+      aria-hidden
+    >
+      <BrandLogo kind="mark" className="h-4 w-4" decorative />
+      <span>{appName}</span>
+      {hospitalName && <span className="truncate text-slate-400">· {hospitalName}</span>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Sidebar pieces
 // ---------------------------------------------------------------------------
 
@@ -277,6 +347,31 @@ function ThemeSwitch() {
   )
 }
 
+/** Offered wherever the browser can install the app, and explained on iOS. */
+function InstallButton() {
+  const { appName } = useBranding()
+  const { canInstall, needsManualInstall, install } = useInstallPrompt()
+  if (!canInstall && !needsManualInstall) return null
+
+  const onClick = async () => {
+    if (canInstall) {
+      const outcome = await install()
+      if (outcome === 'accepted') toast.success(`${appName} is being installed`)
+      return
+    }
+    toast(`Add ${appName} to your Home Screen`, {
+      description: 'Tap the Share button in Safari, then choose "Add to Home Screen".',
+    })
+  }
+
+  return (
+    <Button variant="outline" size="sm" fullWidth className="mb-1.5" onClick={() => void onClick()}>
+      <Download className="h-4 w-4" aria-hidden />
+      Install app
+    </Button>
+  )
+}
+
 function SidebarFooter() {
   const { profile, role, signOut } = useAuth()
   const tier = role ? ROLE_TIER_LABELS[ROLE_TIER_OF[role]] : null
@@ -294,6 +389,7 @@ function SidebarFooter() {
           </p>
         </div>
       </div>
+      <InstallButton />
       <div className="mt-1 flex items-center gap-1.5">
         <ThemeSwitch />
         <IconButton
@@ -343,7 +439,7 @@ function MobileDrawer({
       />
       <div
         ref={panelRef}
-        className="relative flex h-full w-[min(19rem,85vw)] flex-col bg-white shadow-2xl animate-drawer-in dark:bg-slate-900"
+        className="relative flex h-full w-[min(19rem,85vw)] flex-col bg-white pt-[var(--titlebar-h)] shadow-2xl animate-drawer-in dark:bg-slate-900"
       >
         <div className="flex h-[4.25rem] shrink-0 items-center gap-2.5 border-b border-slate-200 pl-4 pr-2 dark:border-slate-800">
           <div className="min-w-0 flex-1">
@@ -483,7 +579,7 @@ export function AppLayout() {
   const shortcut = isApplePlatform() ? '⌘K' : 'Ctrl K'
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-dvh bg-slate-50 pt-[var(--titlebar-h)] dark:bg-slate-950">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-brand-fg"
@@ -491,13 +587,16 @@ export function AppLayout() {
         Skip to content
       </a>
 
+      <WindowTitleBar hospitalName={hospital?.name ?? null} />
+      <GlobalLoadingBar />
+
       {/*
         Fixed rather than sticky. A sticky sidebar only stays put while its
         containing block is taller than it is, which made it dependent on the
         rest of the shell; fixed pins it to the viewport unconditionally. The
         content column is inset by the same width instead.
       */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900 no-print">
+      <aside className="fixed bottom-0 left-0 top-[var(--titlebar-h)] z-40 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900 no-print">
         <Brand />
         <NavList items={visibleNav} pendingCount={pending.data} />
         <SidebarFooter />
@@ -511,7 +610,7 @@ export function AppLayout() {
       />
 
       <div className="flex min-h-dvh min-w-0 flex-col lg:pl-64 print:pl-0">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 pt-safe-t backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 no-print">
+        <header className="sticky top-[var(--titlebar-h)] z-30 border-b border-slate-200 bg-white/90 pt-safe-t backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 no-print">
           <div className="flex h-14 items-center gap-2 px-gutter">
             {/* Phones reach the full nav through the tab bar's More tab, so
                 the hamburger is only needed at tablet widths. */}
@@ -528,7 +627,7 @@ export function AppLayout() {
             <div className="min-w-0 flex-1">
               {hospital ? (
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <HospitalLogo hospital={hospital} size="sm" className="hidden xs:inline-grid" />
+                  <HospitalLogo hospital={hospital} size="sm" className="hidden xs:inline-flex" />
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">

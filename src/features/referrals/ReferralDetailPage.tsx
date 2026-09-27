@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/auth/AuthProvider'
+import { DetailPageSkeleton } from '@/components/ui/skeletons'
 import {
   Alert,
   Badge,
@@ -28,7 +29,6 @@ import {
   EmptyState,
   ErrorBlock,
   Field,
-  LoadingBlock,
   Meter,
   Modal,
   PageHeader,
@@ -103,11 +103,7 @@ export default function ReferralDetailPage() {
   }, [modal])
 
   if (isLoading) {
-    return (
-      <Card>
-        <LoadingBlock label="Loading referral" rows={5} />
-      </Card>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (error) {
@@ -164,7 +160,8 @@ export default function ReferralDetailPage() {
       },
     })
   }
-  const counterpart = side === 'receiving' ? referral.requesting_hospital : referral.receiving_hospital
+  const counterpart =
+    side === 'receiving' ? referral.requesting_hospital : referral.receiving_hospital
 
   const hospitalNames: Record<string, string> = {}
   if (referral.requesting_hospital) {
@@ -383,9 +380,7 @@ export default function ReferralDetailPage() {
             <Button
               variant="danger"
               loading={updateStatus.isPending}
-              onClick={() =>
-                void runTransition('cancelled', { notes: reason.trim() || undefined })
-              }
+              onClick={() => void runTransition('cancelled', { notes: reason.trim() || undefined })}
             >
               Cancel referral
             </Button>
@@ -744,10 +739,7 @@ function ScoreSnapshotCard({
           <DetailItem
             label="Readiness then"
             value={
-              <StatusDot
-                status={selected.readiness}
-                label={READINESS_LABELS[selected.readiness]}
-              />
+              <StatusDot status={selected.readiness} label={READINESS_LABELS[selected.readiness]} />
             }
           />
           <DetailItem label="Distance" value={formatDistance(selected.distance_km)} />
@@ -797,7 +789,13 @@ function ScoreSnapshotCard({
 
 function BreakdownRow({ detail }: { detail: ResourceScoreDetail }) {
   const percent = Math.round(detail.availability * 100)
-  const tone = detail.blocking ? 'danger' : percent >= 70 ? 'success' : percent > 0 ? 'warning' : 'danger'
+  const tone = detail.blocking
+    ? 'danger'
+    : percent >= 70
+      ? 'success'
+      : percent > 0
+        ? 'warning'
+        : 'danger'
 
   return (
     <li>
@@ -814,7 +812,12 @@ function BreakdownRow({ detail }: { detail: ResourceScoreDetail }) {
           {describeValue(detail)}
         </span>
       </div>
-      <Meter value={percent} tone={tone} className="mt-1.5" label={`${detail.label} availability`} />
+      <Meter
+        value={percent}
+        tone={tone}
+        className="mt-1.5"
+        label={`${detail.label} availability`}
+      />
     </li>
   )
 }

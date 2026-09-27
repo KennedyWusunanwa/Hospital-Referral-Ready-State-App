@@ -16,7 +16,8 @@ import {
   SlidersHorizontal,
   Users,
 } from 'lucide-react'
-import { PageHeader, Spinner } from '@/components/ui'
+import { Card, PageHeader } from '@/components/ui'
+import { FilterBarSkeleton, TableSkeleton } from '@/components/ui/skeletons'
 import { cn } from '@/lib/utils'
 
 const ConsoleOverview = lazy(() => import('./ConsoleOverview'))
@@ -41,8 +42,11 @@ const TABS = [
 
 function TabFallback() {
   return (
-    <div className="flex items-center justify-center py-16">
-      <Spinner className="h-6 w-6" />
+    <div className="space-y-4">
+      <FilterBarSkeleton controls={3} />
+      <Card>
+        <TableSkeleton />
+      </Card>
     </div>
   )
 }

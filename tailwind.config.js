@@ -69,6 +69,10 @@ export default {
           from: { transform: 'translateY(100%)', opacity: '0' },
           to: { transform: 'translateY(0)', opacity: '1' },
         },
+        'loading-bar': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in .18s ease-out',
@@ -76,6 +80,7 @@ export default {
         'overlay-in': 'overlay-in .2s ease-out',
         'drawer-in': 'drawer-in .24s cubic-bezier(0.32, 0.72, 0, 1)',
         'sheet-up': 'sheet-up .28s cubic-bezier(0.32, 0.72, 0, 1)',
+        'loading-bar': 'loading-bar 1.4s ease-in-out infinite',
       },
     },
   },

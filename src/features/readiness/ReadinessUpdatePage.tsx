@@ -14,6 +14,7 @@ import { useController, useForm, type Control } from 'react-hook-form'
 import { toast } from 'sonner'
 import { ArrowLeft, CheckCircle2, History, Save } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
+import { FormSkeleton } from '@/components/ui/skeletons'
 import {
   Alert,
   Badge,
@@ -272,7 +273,11 @@ function BloodGroupField({
 }) {
   const { field, fieldState } = useController({ control, name: `bloodStock.${group}` })
   return (
-    <Field label={`${group} units`} hint={`On record: ${current}`} error={fieldState.error?.message}>
+    <Field
+      label={`${group} units`}
+      hint={`On record: ${current}`}
+      error={fieldState.error?.message}
+    >
       {({ id, describedBy }) => (
         <Input
           id={id}
@@ -623,7 +628,7 @@ export default function ReadinessUpdatePage() {
   const template = department ? DEPARTMENT_TEMPLATES[department.template_key] : null
 
   const body = () => {
-    if (departmentQuery.isPending) return <LoadingBlock label="Loading department" rows={4} />
+    if (departmentQuery.isPending) return <FormSkeleton fields={6} />
     if (departmentQuery.isError) {
       return (
         <ErrorBlock error={departmentQuery.error} onRetry={() => void departmentQuery.refetch()} />
@@ -644,10 +649,12 @@ export default function ReadinessUpdatePage() {
       )
     }
     if (resourcesQuery.isError) {
-      return <ErrorBlock error={resourcesQuery.error} onRetry={() => void resourcesQuery.refetch()} />
+      return (
+        <ErrorBlock error={resourcesQuery.error} onRetry={() => void resourcesQuery.refetch()} />
+      )
     }
     if (resourcesQuery.isPending || bloodQuery.isPending || currentShiftQuery.isPending) {
-      return <LoadingBlock label="Loading current values" rows={6} />
+      return <FormSkeleton fields={8} title={false} />
     }
 
     return (

@@ -31,7 +31,6 @@ import {
   ErrorBlock,
   Field,
   Input,
-  LoadingBlock,
   Meter,
   PageHeader,
   Select,
@@ -42,6 +41,7 @@ import {
   Tabs,
 } from '@/components/ui'
 import { useAuth } from '@/auth/AuthProvider'
+import { ChartSkeleton, StatGridSkeleton, TableSkeleton } from '@/components/ui/skeletons'
 import { useHospitals } from '@/features/hospitals/useHospitals'
 import {
   REFERRAL_STATUSES,
@@ -190,13 +190,7 @@ const TD_BASE = 'border-b border-slate-100 px-3 py-2 dark:border-slate-800/70'
 // never paid by a shift in-charge who can only see their own hospital)
 // ---------------------------------------------------------------------------
 
-function HospitalPicker({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (value: string) => void
-}) {
+function HospitalPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const { data: hospitals, isPending, isError } = useHospitals({ onlyActive: true })
 
   return (
@@ -279,7 +273,21 @@ function OverviewTab({
     })
   }, [analytics, from, hospitalId, to])
 
-  if (query.isPending) return <LoadingBlock label="Loading referral analytics" rows={4} />
+  if (query.isPending) {
+    return (
+      <div className="space-y-4">
+        <StatGridSkeleton count={4} />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="p-5">
+            <ChartSkeleton />
+          </Card>
+          <Card className="p-5">
+            <ChartSkeleton />
+          </Card>
+        </div>
+      </div>
+    )
+  }
   if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
   if (!analytics) return <ErrorBlock error="No analytics returned." />
 
@@ -521,9 +529,7 @@ function HospitalsTab({
       'Acceptance rate (%)': clampPercent(row.acceptance_rate, acceptanceScale).toFixed(1),
       'Avg response': formatSeconds(row.avg_response_seconds),
       'Avg completion':
-        row.avg_completion_minutes === null
-          ? '-'
-          : formatSeconds(row.avg_completion_minutes * 60),
+        row.avg_completion_minutes === null ? '-' : formatSeconds(row.avg_completion_minutes * 60),
       'Compliance rate (%)': clampPercent(row.compliance_rate, complianceScale).toFixed(1),
     }))
     void exportRows(
@@ -534,7 +540,13 @@ function HospitalsTab({
     )
   }, [acceptanceScale, complianceScale, from, hospitalId, sorted, to])
 
-  if (query.isPending) return <LoadingBlock label="Loading hospital performance" rows={4} />
+  if (query.isPending) {
+    return (
+      <Card>
+        <TableSkeleton rows={6} />
+      </Card>
+    )
+  }
   if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
 
   if (rows.length === 0) {
@@ -728,7 +740,8 @@ function ComplianceTab({
   const sorted = useMemo(
     () =>
       [...rows].sort((a, b) => {
-        const delta = clampPercent(a.compliance_rate, scale) - clampPercent(b.compliance_rate, scale)
+        const delta =
+          clampPercent(a.compliance_rate, scale) - clampPercent(b.compliance_rate, scale)
         if (delta !== 0) return delta
         return b.missed_shifts - a.missed_shifts
       }),
@@ -768,7 +781,13 @@ function ComplianceTab({
     })
   }, [days, hospitalId, scale, sorted, timezone])
 
-  if (query.isPending) return <LoadingBlock label="Loading compliance report" rows={4} />
+  if (query.isPending) {
+    return (
+      <Card>
+        <TableSkeleton rows={6} />
+      </Card>
+    )
+  }
   if (query.isError) return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
 
   if (sorted.length === 0) {
@@ -1012,9 +1031,7 @@ export default function ReportsPage() {
               )}
             </Field>
 
-            {viewAll && (
-              <HospitalPicker value={selectedHospital} onChange={setSelectedHospital} />
-            )}
+            {viewAll && <HospitalPicker value={selectedHospital} onChange={setSelectedHospital} />}
           </div>
 
           <p className="hint">

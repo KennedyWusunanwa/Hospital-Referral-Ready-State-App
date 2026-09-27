@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Building2, LayoutGrid, List, Plus, Search } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
+import { CardGridSkeleton, TableSkeleton } from '@/components/ui/skeletons'
 import { Gate } from '@/auth/RequireAuth'
 import {
   Badge,
@@ -12,7 +13,7 @@ import {
   ErrorBlock,
   Field,
   FilterBar,
-  LoadingBlock,
+  FilterBarAdvanced,
   PageHeader,
   SearchInput,
   SegmentedControl,
@@ -253,82 +254,94 @@ export default function HospitalListPage() {
           )}
         </Field>
 
-        <Field label="Region">
-          {({ id }) => (
-            <Select
-              id={id}
-              value={state.region}
-              onChange={(event) => update({ region: event.target.value })}
-            >
-              <option value="">All regions</option>
-              {regions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        <FilterBarAdvanced>
+          <Field label="Region">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.region}
+                onChange={(event) => update({ region: event.target.value })}
+              >
+                <option value="">All regions</option>
+                {regions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
 
-        <Field label="Level">
-          {({ id }) => (
-            <Select
-              id={id}
-              value={state.level}
-              onChange={(event) => update({ level: event.target.value })}
-            >
-              <option value="">All levels</option>
-              {HOSPITAL_LEVELS.map((value) => (
-                <option key={value} value={value}>
-                  {HOSPITAL_LEVEL_LABELS[value]}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+          <Field label="Level">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.level}
+                onChange={(event) => update({ level: event.target.value })}
+              >
+                <option value="">All levels</option>
+                {HOSPITAL_LEVELS.map((value) => (
+                  <option key={value} value={value}>
+                    {HOSPITAL_LEVEL_LABELS[value]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
 
-        <Field label="Sort by">
-          {({ id }) => (
-            <Select id={id} value={sort} onChange={(event) => update({ sort: event.target.value })}>
-              {origin && <option value="distance">Distance from you</option>}
-              <option value="name">Name</option>
-              <option value="readiness">Readiness (worst first)</option>
-              <option value="region">Region</option>
-              <option value="level">Facility level</option>
-            </Select>
-          )}
-        </Field>
+          <Field label="Sort by">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={sort}
+                onChange={(event) => update({ sort: event.target.value })}
+              >
+                {origin && <option value="distance">Distance from you</option>}
+                <option value="name">Name</option>
+                <option value="readiness">Readiness (worst first)</option>
+                <option value="region">Region</option>
+                <option value="level">Facility level</option>
+              </Select>
+            )}
+          </Field>
 
-        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Readiness</span>
-          {READINESS_STATUSES.map((status) => (
-            <Chip
-              key={status}
-              active={state.status === status}
-              onClick={() => update({ status: state.status === status ? '' : status })}
-              tone={status === 'green' ? 'success' : status === 'yellow' ? 'warning' : 'danger'}
-              count={readinessQuery.data ? statusCounts[status] : undefined}
-            >
-              <StatusDot status={status} />
-              {READINESS_LABELS[status]}
-            </Chip>
-          ))}
-        </div>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Readiness
+            </span>
+            {READINESS_STATUSES.map((status) => (
+              <Chip
+                key={status}
+                active={state.status === status}
+                onClick={() => update({ status: state.status === status ? '' : status })}
+                tone={status === 'green' ? 'success' : status === 'yellow' ? 'warning' : 'danger'}
+                count={readinessQuery.data ? statusCounts[status] : undefined}
+              >
+                <StatusDot status={status} />
+                {READINESS_LABELS[status]}
+              </Chip>
+            ))}
+          </div>
 
-        <div className="flex items-end sm:col-span-2">
-          <Toggle
-            checked={state.accepting}
-            onChange={(next) => update({ accepting: next })}
-            label="Accepting referrals only"
-            description="Hide facilities currently on diversion."
-          />
-        </div>
+          <div className="flex items-end sm:col-span-2">
+            <Toggle
+              checked={state.accepting}
+              onChange={(next) => update({ accepting: next })}
+              label="Accepting referrals only"
+              description="Hide facilities currently on diversion."
+            />
+          </div>
+        </FilterBarAdvanced>
       </FilterBar>
 
       {query.isPending ? (
-        <Card>
-          <LoadingBlock label="Loading hospitals" rows={5} />
-        </Card>
+        view === 'table' ? (
+          <Card>
+            <TableSkeleton />
+          </Card>
+        ) : (
+          <CardGridSkeleton />
+        )
       ) : query.isError ? (
         <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
       ) : hospitals.length === 0 ? (
@@ -354,7 +367,7 @@ export default function HospitalListPage() {
         </Card>
       ) : view === 'table' ? (
         <Card className="overflow-hidden">
-          <Table minWidth="56rem">
+          <Table responsive minWidth="56rem">
             <thead>
               <tr>
                 <Th>Hospital</Th>
@@ -372,7 +385,7 @@ export default function HospitalListPage() {
                   key={hospital.id}
                   className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                 >
-                  <Td>
+                  <Td cell="identity">
                     <div className="flex items-center gap-3">
                       <HospitalLogo hospital={hospital} size="sm" />
                       <div className="min-w-0">
@@ -418,7 +431,7 @@ export default function HospitalListPage() {
                       <Badge tone="danger">Diverting</Badge>
                     )}
                   </Td>
-                  <Td align="right">
+                  <Td align="right" cell="actions">
                     <div className="flex justify-end gap-1.5">
                       <CallLink phone={hospital.emergency_phone} label="Emergency" emergency />
                       <CallLink phone={hospital.phone} label="Call" />

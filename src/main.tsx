@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { initTheme } from './lib/theme'
 import { initBranding } from './lib/branding'
+import { captureInstallPrompt } from './lib/installPrompt'
 import './index.css'
 
 // Before the first paint, so the sign-in screen honours the saved preference
@@ -9,6 +10,9 @@ initTheme()
 // Painted from the last known values so the shell does not flash the default
 // blue before app_settings resolves.
 initBranding()
+// The browser offers the install exactly once; catch it before anything else
+// can miss it, so the sidebar button and the banner both work later.
+captureInstallPrompt()
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Root element #root not found')
@@ -55,8 +59,9 @@ function renderConfigurationRequired(root: HTMLElement, missingKeys: readonly st
           <code className="font-mono text-xs">.env</code>.
         </p>
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-          These are read when the site is <strong>built</strong>, not when it is loaded. After adding
-          them you must redeploy &mdash; saving the variables alone will not change this page.
+          These are read when the site is <strong>built</strong>, not when it is loaded. After
+          adding them you must redeploy &mdash; saving the variables alone will not change this
+          page.
         </p>
       </main>
     </div>,

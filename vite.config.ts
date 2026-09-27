@@ -33,9 +33,18 @@ export default defineConfig({
         theme_color: '#1b5cf5',
         background_color: '#f8fafc',
         display: 'standalone',
+        // On desktop (Windows, macOS, ChromeOS) take over the title bar so the
+        // installed window looks like a native app; the app pads its own
+        // chrome below the OS buttons (see .wco-titlebar in index.css).
+        // Browsers that lack the overlay fall back down the list.
+        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
         // Installed desktop windows are resizable, so no orientation lock --
         // the layout is responsive in both directions.
         orientation: 'any',
+        prefer_related_applications: false,
+        // Clicking the taskbar icon focuses the open window rather than opening
+        // a second copy with its own realtime subscriptions.
+        launch_handler: { client_mode: 'navigate-existing' },
         scope: '/',
         start_url: '/',
         lang: 'en',

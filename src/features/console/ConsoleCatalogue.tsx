@@ -10,6 +10,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import { TableSkeleton } from '@/components/ui/skeletons'
 import {
   Pencil,
   Plus,
@@ -32,7 +33,6 @@ import {
   Field,
   FilterBar,
   Input,
-  LoadingBlock,
   Modal,
   SearchInput,
   SegmentedControl,
@@ -546,7 +546,7 @@ export default function ConsoleCatalogue() {
 
       {catalogue.isPending ? (
         <Card>
-          <LoadingBlock label="Loading the catalogue" rows={6} />
+          <TableSkeleton />
         </Card>
       ) : catalogue.isError ? (
         <ErrorBlock error={catalogue.error} onRetry={() => void catalogue.refetch()} />
@@ -579,7 +579,7 @@ export default function ConsoleCatalogue() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <Table minWidth="60rem">
+          <Table responsive minWidth="60rem">
             <thead>
               <tr>
                 <Th>Emergency</Th>
@@ -600,7 +600,7 @@ export default function ConsoleCatalogue() {
                     key={type.id}
                     className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
-                    <Td>
+                    <Td cell="identity">
                       <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900 dark:text-slate-100">
                         {type.name}
                         {!type.is_active && <Badge tone="neutral">Retired</Badge>}
@@ -635,7 +635,7 @@ export default function ConsoleCatalogue() {
                         critical
                       </p>
                     </Td>
-                    <Td align="right">
+                    <Td align="right" cell="actions">
                       <div className="flex justify-end gap-1">
                         <Button
                           size="sm"

@@ -77,12 +77,87 @@
     @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
   }
 
+  /*
+   * Responsive tables. Above the sm breakpoint this is an ordinary table;
+   * below it every row becomes a stacked card and each cell prints the column
+   * heading it belongs to, so nothing has to be scrolled sideways on a phone.
+   */
+  .table-responsive thead {
+    @apply max-sm:hidden;
+  }
+
+  .table-responsive tbody tr {
+    @apply max-sm:block max-sm:border-b max-sm:border-slate-200 max-sm:py-2 dark:max-sm:border-slate-800;
+  }
+
+  .table-responsive tbody td {
+    @apply max-sm:flex max-sm:items-center max-sm:justify-between max-sm:gap-3 max-sm:border-0 max-sm:px-4 max-sm:py-1.5 max-sm:text-right;
+  }
+
+  .table-responsive tbody td[data-label]::before {
+    content: attr(data-label);
+    @apply max-sm:block max-sm:shrink-0 max-sm:text-left max-sm:text-[11px] max-sm:font-semibold max-sm:uppercase max-sm:tracking-wide max-sm:text-slate-500 dark:max-sm:text-slate-400;
+  }
+
+  .table-responsive tbody td[data-cell='identity'] {
+    @apply max-sm:justify-start max-sm:pt-2 max-sm:text-left;
+  }
+
+  .table-responsive tbody td[data-cell='actions'] {
+    @apply max-sm:justify-end max-sm:pb-2 max-sm:pt-2;
+  }
+
+  @media (max-width: 639.98px) {
+    .table-responsive {
+      min-width: 0 !important;
+    }
+  }
+
   .field-label {
     @apply block text-sm font-medium text-slate-700 dark:text-slate-300;
   }
 
   .hint {
     @apply text-xs text-slate-500 dark:text-slate-400;
+  }
+}
+
+/*
+ * Installed desktop app with the window-controls overlay (Windows, macOS,
+ * ChromeOS). The OS draws only its buttons; the app owns the rest of the title
+ * bar and offsets its fixed chrome below it. Outside that mode the variable is
+ * zero and the strip is not rendered at all.
+ */
+:root {
+  --titlebar-h: 0px;
+}
+
+.wco-titlebar {
+  display: none;
+}
+
+@media (display-mode: window-controls-overlay) {
+  :root {
+    --titlebar-h: env(titlebar-area-height, 2rem);
+  }
+
+  .wco-titlebar {
+    display: flex;
+    position: fixed;
+    top: env(titlebar-area-y, 0px);
+    left: env(titlebar-area-x, 0px);
+    width: env(titlebar-area-width, 100%);
+    height: env(titlebar-area-height, 2rem);
+    z-index: 55;
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .wco-titlebar button,
+  .wco-titlebar a,
+  .wco-titlebar input {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
   }
 }
 

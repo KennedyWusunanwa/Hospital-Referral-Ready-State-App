@@ -34,7 +34,6 @@ import {
   ErrorBlock,
   Field,
   Input,
-  LoadingBlock,
   PageHeader,
   Select,
   StatusDot,
@@ -49,6 +48,7 @@ import {
   useScoringConfig,
 } from './useReferrals'
 import { useAuth } from '@/auth/AuthProvider'
+import { FormSkeleton, ProcessLoader } from '@/components/ui/skeletons'
 import { formatDistance, formatDuration, isValidLatLng } from '@/domain/geo'
 import {
   buildCandidateSnapshot,
@@ -430,7 +430,7 @@ export default function NewReferralPage() {
             />
             <CardBody className="space-y-4">
               {emergencyTypesQuery.isPending ? (
-                <LoadingBlock label="Loading emergency types" rows={2} />
+                <FormSkeleton fields={3} title={false} />
               ) : emergencyTypesQuery.isError ? (
                 <ErrorBlock
                   error={emergencyTypesQuery.error}
@@ -721,7 +721,12 @@ export default function NewReferralPage() {
             />
           ) : candidatesLoading && ranked.length === 0 ? (
             <Card>
-              <LoadingBlock label="Scoring nearby hospitals" rows={4} />
+              <Card>
+                <ProcessLoader
+                  label="Ranking nearby hospitals"
+                  hint="Checking live resources, distance and readiness for every facility in range."
+                />
+              </Card>
             </Card>
           ) : (candidatesQuery.data ?? []).length === 0 ? (
             <Card>

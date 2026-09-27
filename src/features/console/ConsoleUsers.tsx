@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { TableSkeleton } from '@/components/ui/skeletons'
 import { Building2, Pencil, PowerOff, RotateCcw, Search, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import {
@@ -14,7 +15,6 @@ import {
   Field,
   FilterBar,
   Input,
-  LoadingBlock,
   Modal,
   SearchInput,
   SegmentedControl,
@@ -359,7 +359,7 @@ export default function ConsoleUsers() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <Stat
           label="Active accounts"
           value={rows.filter((m) => m.is_active).length}
@@ -450,7 +450,7 @@ export default function ConsoleUsers() {
 
       {staff.isPending ? (
         <Card>
-          <LoadingBlock label="Loading accounts" rows={6} />
+          <TableSkeleton />
         </Card>
       ) : staff.isError ? (
         <ErrorBlock error={staff.error} onRetry={() => void staff.refetch()} />
@@ -477,7 +477,7 @@ export default function ConsoleUsers() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <Table minWidth="64rem">
+          <Table responsive minWidth="64rem">
             <thead>
               <tr>
                 <Th
@@ -538,7 +538,7 @@ export default function ConsoleUsers() {
                     key={member.id}
                     className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
-                    <Td>
+                    <Td cell="identity">
                       <div className="flex items-center gap-3">
                         <Avatar name={member.full_name} />
                         <div className="min-w-0">
@@ -590,7 +590,7 @@ export default function ConsoleUsers() {
                         {relativeTime(member.created_at)}
                       </span>
                     </Td>
-                    <Td align="right">
+                    <Td align="right" cell="actions">
                       <div className="flex justify-end gap-1">
                         <Button size="sm" variant="outline" onClick={() => setEditing(member)}>
                           <Pencil className="h-3.5 w-3.5" aria-hidden />

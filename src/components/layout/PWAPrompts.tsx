@@ -3,7 +3,9 @@
  *
  * Both are deliberately quiet: a clinician mid-referral must never have the
  * page reloaded under them, and an install banner that cannot be dismissed
- * permanently is worse than no banner at all.
+ * permanently is worse than no banner at all. The install prompt itself is
+ * captured at boot by `lib/installPrompt`, so the sidebar button and the
+ * command palette can offer the same install on desktop and mobile alike.
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -11,35 +13,14 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Download, RefreshCw, Share, X } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { APP_NAME } from '@/lib/constants'
+import { useInstallPrompt } from '@/lib/installPrompt'
 
 const DISMISS_KEY = 'fern.install-dismissed'
 /** Re-offer the install a month after a dismissal rather than never again. */
 const DISMISS_DAYS = 30
 const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000
-
-/** Chromium-only; not in lib.dom, so it is declared where it is used. */
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
-function isStandalone(): boolean {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    // iOS Safari predates the display-mode media query for home-screen apps.
-    (window.navigator as { standalone?: boolean }).standalone === true
-  )
-}
-
-function isIos(): boolean {
-  if (typeof navigator === 'undefined') return false
-  return (
-    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-    // iPadOS 13+ reports as a Mac; the touch points give it away.
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  )
-}
+/** Let the person settle on the first screen before offering anything. */
+const OFFER_DELAY_MS = 8_000
 
 function dismissedRecently(): boolean {
   try {
@@ -80,32 +61,13 @@ export function PWAPrompts() {
     },
   })
 
-  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null)
-  const [showIosHint, setShowIosHint] = useState(false)
-  const [installDismissed, setInstallDismissed] = useState(false)
+  const { canInstall, installed, needsManualInstall, install } = useInstallPrompt()
+  const [installDismissed, setInstallDismissed] = useState(() => dismissedRecently())
+  const [settled, setSettled] = useState(false)
 
   useEffect(() => {
-    if (isStandalone() || dismissedRecently()) return
-
-    const onBeforeInstall = (event: Event) => {
-      // Keep the browser's own mini-infobar from firing; we offer the install
-      // at a calmer moment instead.
-      event.preventDefault()
-      setInstallEvent(event as BeforeInstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', onBeforeInstall)
-
-    const onInstalled = () => setInstallEvent(null)
-    window.addEventListener('appinstalled', onInstalled)
-
-    // iOS never fires beforeinstallprompt, so Add to Home Screen has to be
-    // explained rather than triggered.
-    if (isIos()) setShowIosHint(true)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall)
-      window.removeEventListener('appinstalled', onInstalled)
-    }
+    const timer = window.setTimeout(() => setSettled(true), OFFER_DELAY_MS)
+    return () => window.clearTimeout(timer)
   }, [])
 
   const dismissInstall = useCallback(() => {
@@ -117,19 +79,19 @@ export function PWAPrompts() {
     }
   }, [])
 
-  const install = useCallback(async () => {
-    if (!installEvent) return
-    await installEvent.prompt()
-    const { outcome } = await installEvent.userChoice
-    setInstallEvent(null)
+  const onInstall = useCallback(async () => {
+    const outcome = await install()
     if (outcome === 'dismissed') dismissInstall()
-  }, [installEvent, dismissInstall])
+  }, [install, dismissInstall])
 
   // An available update outranks an install offer.
   if (needRefresh) {
     return (
       <Banner>
-        <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden />
+        <RefreshCw
+          className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400"
+          aria-hidden
+        />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             A new version is ready
@@ -148,21 +110,24 @@ export function PWAPrompts() {
     )
   }
 
-  if (installDismissed) return null
+  if (installed || installDismissed || !settled) return null
 
-  if (installEvent) {
+  if (canInstall) {
     return (
       <Banner>
-        <Download className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden />
+        <Download
+          className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400"
+          aria-hidden
+        />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             Install {APP_NAME}
           </p>
           <p className="mt-0.5 hint">
-            Add it to your device for full-screen access and faster start-up.
+            Opens in its own window, starts faster and stays in your taskbar or home screen.
           </p>
           <div className="mt-2 flex gap-2">
-            <Button size="sm" onClick={() => void install()}>
+            <Button size="sm" onClick={() => void onInstall()}>
               Install
             </Button>
             <Button size="sm" variant="ghost" onClick={dismissInstall}>
@@ -182,7 +147,7 @@ export function PWAPrompts() {
     )
   }
 
-  if (showIosHint) {
+  if (needsManualInstall) {
     return (
       <Banner>
         <Share className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden />

@@ -101,7 +101,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[max(1rem,8vh)]"
+      className="fixed inset-0 z-[60] flex items-start justify-center p-0 sm:p-4 sm:pt-[max(1rem,8vh)]"
       role="dialog"
       aria-modal="true"
       aria-label="Search"
@@ -112,7 +112,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         aria-hidden
       />
 
-      <div className="relative z-10 flex max-h-[min(36rem,80vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-fade-in dark:border-slate-700 dark:bg-slate-900">
+      <div className="relative z-10 flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden border-slate-200 bg-white pt-[var(--titlebar-h)] shadow-2xl animate-fade-in sm:h-auto sm:max-h-[min(36rem,80vh)] sm:rounded-2xl sm:border sm:pt-0 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 dark:border-slate-800">
           {loading ? (
             <Loader2 className="h-5 w-5 shrink-0 animate-spin text-slate-400" aria-hidden />
@@ -136,7 +136,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             spellCheck={false}
             className="h-14 min-w-0 flex-1 bg-transparent text-base text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-50 dark:placeholder:text-slate-500"
           />
-          {term ? (
+          {term && (
             <button
               type="button"
               onClick={() => setTerm('')}
@@ -145,12 +145,22 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             >
               <X className="h-4 w-4" aria-hidden />
             </button>
-          ) : (
-            <Kbd className="hidden sm:inline-flex">Esc</Kbd>
           )}
+          {!term && <Kbd className="hidden sm:inline-flex">Esc</Kbd>}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm font-medium text-brand-700 sm:hidden dark:text-brand-300"
+          >
+            Close
+          </button>
         </div>
 
-        <div id="palette-results" role="listbox" className="min-h-0 flex-1 overflow-y-auto p-2">
+        <div
+          id="palette-results"
+          role="listbox"
+          className="min-h-0 flex-1 overflow-y-auto p-2 pb-safe-b sm:pb-2"
+        >
           {empty ? (
             <div className="px-3 py-10 text-center">
               <p className="text-sm font-medium text-slate-800 dark:text-slate-200">

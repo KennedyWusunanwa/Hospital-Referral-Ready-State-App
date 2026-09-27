@@ -3,7 +3,8 @@ import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { ArrowRight, Building2, ClipboardList, ScrollText, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { Gate } from '@/auth/RequireAuth'
-import { Card, CardBody, PageHeader, Spinner } from '@/components/ui'
+import { Card, CardBody, PageHeader } from '@/components/ui'
+import { FormSkeleton } from '@/components/ui/skeletons'
 import { cn } from '@/lib/utils'
 import type { Capability } from '@/lib/constants'
 
@@ -27,11 +28,7 @@ const TABS: AdminTab[] = [
 ]
 
 function TabFallback() {
-  return (
-    <div className="flex items-center justify-center py-16">
-      <Spinner className="h-6 w-6" />
-    </div>
-  )
+  return <FormSkeleton />
 }
 
 /** Shown instead of a screen the current role may not open. */

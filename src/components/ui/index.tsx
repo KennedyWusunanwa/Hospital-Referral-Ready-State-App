@@ -7,14 +7,17 @@
  */
 
 import {
+  Children,
   createContext,
   forwardRef,
+  isValidElement,
   useContext,
   useEffect,
   useId,
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type CSSProperties,
   type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -424,9 +427,13 @@ export function Spinner({ className }: { className?: string }) {
   )
 }
 
-export function Skeleton({ className }: { className?: string }) {
+export function Skeleton({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
-    <div className={cn('animate-pulse rounded-md bg-slate-200 dark:bg-slate-800', className)} />
+    <div
+      className={cn('animate-pulse rounded-md bg-slate-200 dark:bg-slate-800', className)}
+      style={style}
+      aria-hidden
+    />
   )
 }
 
@@ -538,7 +545,7 @@ export function Modal({
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : undefined}
         className={cn(
-          'relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-xl animate-fade-in sm:rounded-2xl dark:bg-slate-900',
+          'relative z-10 max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-white pb-safe-b shadow-xl animate-sheet-up sm:animate-fade-in sm:rounded-2xl sm:pb-0 dark:bg-slate-900',
           sizes[size],
         )}
       >
@@ -988,23 +995,81 @@ export function SegmentedControl<T extends string>({
  */
 export function FilterBar({
   children,
+  advanced,
+  advancedLabel = 'More filters',
+  advancedCount = 0,
   activeCount = 0,
   onClear,
   summary,
   gridClassName = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4',
+  advancedClassName = 'grid gap-3 sm:grid-cols-2 lg:grid-cols-4',
   className,
 }: {
   children: ReactNode
+  /**
+   * Secondary controls. Always visible on a wide screen; on a phone they sit
+   * behind a toggle so the list itself stays within reach of the thumb.
+   */
+  advanced?: ReactNode
+  advancedLabel?: string
+  /** How many of the advanced controls are set, shown on the toggle. */
+  advancedCount?: number
   activeCount?: number
   onClear?: () => void
   summary?: ReactNode
   gridClassName?: string
+  advancedClassName?: string
   className?: string
 }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   const showFooter = Boolean(summary) || (activeCount > 0 && Boolean(onClear))
+
+  // `<FilterBarAdvanced>` among the children is an alternative to the prop,
+  // so a page can keep its controls in reading order.
+  const primary: ReactNode[] = []
+  let advancedFromChildren: ReactNode = null
+  Children.forEach(children, (child) => {
+    if (isValidElement(child) && child.type === FilterBarAdvanced) {
+      advancedFromChildren = (child.props as { children?: ReactNode }).children ?? null
+    } else if (child !== null && child !== undefined && child !== false) {
+      primary.push(child)
+    }
+  })
+  const advancedContent = advanced ?? advancedFromChildren
+
   return (
     <Card className={cn('p-3 sm:p-4', className)}>
-      <div className={gridClassName}>{children}</div>
+      <div className={gridClassName}>{primary}</div>
+      {advancedContent && (
+        <>
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((open) => !open)}
+            aria-expanded={advancedOpen}
+            className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 lg:hidden dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <ChevronDown
+              className={cn('h-4 w-4 transition-transform', advancedOpen && 'rotate-180')}
+              aria-hidden
+            />
+            {advancedLabel}
+            {advancedCount > 0 && (
+              <span className="rounded-full bg-brand-600 px-1.5 text-[10px] text-brand-fg">
+                {advancedCount}
+              </span>
+            )}
+          </button>
+          <div
+            className={cn(
+              'mt-3 border-t border-slate-100 pt-3 dark:border-slate-800',
+              advancedClassName,
+              advancedOpen ? 'grid' : 'hidden lg:grid',
+            )}
+          >
+            {advancedContent}
+          </div>
+        </>
+      )}
       {showFooter && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
           <p className="hint" aria-live="polite">
@@ -1020,6 +1085,11 @@ export function FilterBar({
       )}
     </Card>
   )
+}
+
+/** Wraps the secondary controls of a `FilterBar`; see its `advanced` prop. */
+export function FilterBarAdvanced({ children }: { children: ReactNode }) {
+  return <>{children}</>
 }
 
 export function Pagination({
@@ -1286,15 +1356,57 @@ export const TD_CLASS =
 export function Table({
   children,
   minWidth = '48rem',
+  responsive = false,
   className,
 }: {
   children: ReactNode
   minWidth?: string
+  /**
+   * Below the sm breakpoint, render each row as a stacked card. Cells then
+   * need a `label` (the column heading) or a `cell` role to lay out well.
+   */
+  responsive?: boolean
   className?: string
 }) {
+  const ref = useRef<HTMLTableElement>(null)
+
+  // Each body cell learns its column heading, so the phone layout can print
+  // it without every call site repeating the header text. Cells that declare
+  // a `cell` role (identity, actions) are left unlabelled on purpose.
+  useEffect(() => {
+    if (!responsive) return
+    const table = ref.current
+    if (!table) return
+    const apply = () => {
+      const headers = Array.from(table.querySelectorAll('thead th')).map(
+        (th) => th.textContent?.trim() ?? '',
+      )
+      table.querySelectorAll('tbody tr').forEach((row) => {
+        Array.from(row.children).forEach((cell, index) => {
+          if (!(cell instanceof HTMLElement) || cell.dataset.cell) return
+          const label = headers[index]
+          if (label) cell.dataset.label = label
+          else delete cell.dataset.label
+        })
+      })
+    }
+    apply()
+    const observer = new MutationObserver(apply)
+    observer.observe(table, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [responsive, children])
+
   return (
     <div className="overflow-x-auto">
-      <table className={cn('w-full border-collapse text-sm', className)} style={{ minWidth }}>
+      <table
+        ref={ref}
+        className={cn(
+          'w-full border-collapse text-sm',
+          responsive && 'table-responsive',
+          className,
+        )}
+        style={{ minWidth }}
+      >
         {children}
       </table>
     </div>
@@ -1357,15 +1469,23 @@ export function Td({
   className,
   align = 'left',
   colSpan,
+  label,
+  cell,
 }: {
   children?: ReactNode
   className?: string
   align?: 'left' | 'right' | 'center'
   colSpan?: number
+  /** The column heading, printed beside the value in a responsive table's card layout. */
+  label?: string
+  /** `identity` is the row's title cell; `actions` holds its buttons. Both drop the label. */
+  cell?: 'identity' | 'actions'
 }) {
   return (
     <td
       colSpan={colSpan}
+      data-label={label}
+      data-cell={cell}
       className={cn(
         TD_CLASS,
         align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left',

@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Building2, Clock, MapPin, Pencil, Send, Stethoscope, Wind } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
+import { DetailPageSkeleton } from '@/components/ui/skeletons'
 import {
   Alert,
   Badge,
@@ -9,7 +10,6 @@ import {
   CardHeader,
   EmptyState,
   ErrorBlock,
-  LoadingBlock,
   PageHeader,
   Stat,
   StatusDot,
@@ -102,14 +102,7 @@ export default function HospitalDetailPage() {
   )
 
   if (hospitalQuery.isPending) {
-    return (
-      <div className="space-y-4">
-        {backLink}
-        <Card>
-          <LoadingBlock label="Loading hospital" rows={4} />
-        </Card>
-      </div>
-    )
+    return <DetailPageSkeleton />
   }
 
   if (hospitalQuery.isError) {

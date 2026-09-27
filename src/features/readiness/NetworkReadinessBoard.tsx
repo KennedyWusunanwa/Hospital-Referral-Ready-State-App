@@ -17,13 +17,14 @@ import {
   ErrorBlock,
   Field,
   FilterBar,
-  LoadingBlock,
+  FilterBarAdvanced,
   SearchInput,
   Select,
   Stat,
   StatusDot,
 } from '@/components/ui'
 import { summariseHospitalReadiness } from '@/domain/readiness'
+import { CardGridSkeleton } from '@/components/ui/skeletons'
 import { HospitalLogo } from '@/features/hospitals/HospitalLogo'
 import { useHospitals } from '@/features/hospitals/useHospitals'
 import {
@@ -228,7 +229,7 @@ export function NetworkReadinessBoard() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Stat label="Hospitals" value={groups.length} sublabel="Active on the network" />
         <Stat
           label="Fully current"
@@ -266,54 +267,64 @@ export function NetworkReadinessBoard() {
             />
           )}
         </Field>
-        <Field label="Region">
-          {({ id }) => (
-            <Select
-              id={id}
-              value={state.region}
-              onChange={(e) => update({ region: e.target.value })}
-            >
-              <option value="">All regions</option>
-              {regions.map((region) => (
-                <option key={region} value={region}>
-                  {region}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label="Level">
-          {({ id }) => (
-            <Select id={id} value={state.level} onChange={(e) => update({ level: e.target.value })}>
-              <option value="">All levels</option>
-              {levels.map((level) => (
-                <option key={level} value={level}>
-                  {HOSPITAL_LEVEL_LABELS[level] ?? level}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Readiness</span>
-          {READINESS_STATUSES.map((status) => (
-            <Chip
-              key={status}
-              active={state.status === status}
-              onClick={() => update({ status: state.status === status ? '' : status })}
-              tone={STATUS_TONE[status]}
-              count={counts[status]}
-            >
-              <StatusDot status={status} />
-              {READINESS_LABELS[status]}
-            </Chip>
-          ))}
-        </div>
+        <FilterBarAdvanced>
+          <Field label="Region">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.region}
+                onChange={(e) => update({ region: e.target.value })}
+              >
+                <option value="">All regions</option>
+                {regions.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Level">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.level}
+                onChange={(e) => update({ level: e.target.value })}
+              >
+                <option value="">All levels</option>
+                {levels.map((level) => (
+                  <option key={level} value={level}>
+                    {HOSPITAL_LEVEL_LABELS[level] ?? level}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Readiness
+            </span>
+            {READINESS_STATUSES.map((status) => (
+              <Chip
+                key={status}
+                active={state.status === status}
+                onClick={() => update({ status: state.status === status ? '' : status })}
+                tone={STATUS_TONE[status]}
+                count={counts[status]}
+              >
+                <StatusDot status={status} />
+                {READINESS_LABELS[status]}
+              </Chip>
+            ))}
+          </div>
+        </FilterBarAdvanced>
       </FilterBar>
 
       {loading ? (
         <Card>
-          <LoadingBlock label="Loading network readiness" rows={5} />
+          <div className="p-4">
+            <CardGridSkeleton count={6} columns="md:grid-cols-2 2xl:grid-cols-3" />
+          </div>
         </Card>
       ) : error ? (
         <ErrorBlock

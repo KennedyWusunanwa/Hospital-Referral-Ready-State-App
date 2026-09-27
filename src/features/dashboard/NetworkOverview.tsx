@@ -47,7 +47,14 @@ interface HospitalCompliance {
 function byHospital(rows: ComplianceRow[]): HospitalCompliance[] {
   const totals = new Map<
     string,
-    { name: string; expected: number; actual: number; missed: number; departments: number; last: string | null }
+    {
+      name: string
+      expected: number
+      actual: number
+      missed: number
+      departments: number
+      last: string | null
+    }
   >()
 
   for (const row of rows) {
@@ -109,7 +116,7 @@ export function NetworkOverview({ now }: { now: Date }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Stat
           label="Active hospitals"
           icon={<Building2 className="h-4 w-4" aria-hidden />}
@@ -125,9 +132,7 @@ export function NetworkOverview({ now }: { now: Date }) {
           icon={<ClipboardList className="h-4 w-4" aria-hidden />}
           value={statValue(analytics, (data) => data.total)}
           sublabel={
-            analytics.data
-              ? `${formatPercent(analytics.data.acceptance_rate)} accepted`
-              : undefined
+            analytics.data ? `${formatPercent(analytics.data.acceptance_rate)} accepted` : undefined
           }
         />
         <Stat

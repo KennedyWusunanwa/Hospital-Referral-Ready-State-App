@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { TableSkeleton } from '@/components/ui/skeletons'
 import { Building2, ClipboardList, ExternalLink, Pencil, Plus, Search } from 'lucide-react'
 import {
   Badge,
@@ -11,7 +12,7 @@ import {
   ErrorBlock,
   Field,
   FilterBar,
-  LoadingBlock,
+  FilterBarAdvanced,
   Modal,
   SearchInput,
   SegmentedControl,
@@ -188,71 +189,73 @@ export default function ConsoleHospitals() {
             Add hospital
           </Button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Region">
-            {({ id }) => (
-              <Select
-                id={id}
-                value={state.region}
-                onChange={(e) => update({ region: e.target.value })}
-              >
-                <option value="">All regions</option>
-                {regions.map((region) => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field label="Level">
-            {({ id }) => (
-              <Select
-                id={id}
-                value={state.level}
-                onChange={(e) => update({ level: e.target.value })}
-              >
-                <option value="">All levels</option>
-                {HOSPITAL_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {HOSPITAL_LEVEL_LABELS[level]}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field label="Referrals">
-            {({ id }) => (
-              <Select
-                id={id}
-                value={state.accepting}
-                onChange={(e) => update({ accepting: e.target.value })}
-              >
-                <option value="">Accepting or not</option>
-                <option value="yes">Accepting</option>
-                <option value="no">On diversion</option>
-              </Select>
-            )}
-          </Field>
-          <div className="flex flex-wrap items-end gap-2">
-            {READINESS_STATUSES.map((status: ReadinessStatus) => (
-              <Chip
-                key={status}
-                active={state.readiness === status}
-                onClick={() => update({ readiness: state.readiness === status ? '' : status })}
-                tone={STATUS_TONE[status]}
-              >
-                <StatusDot status={status} />
-                {READINESS_LABELS[status]}
-              </Chip>
-            ))}
+        <FilterBarAdvanced>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Region">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={state.region}
+                  onChange={(e) => update({ region: e.target.value })}
+                >
+                  <option value="">All regions</option>
+                  {regions.map((region) => (
+                    <option key={region} value={region}>
+                      {region}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Level">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={state.level}
+                  onChange={(e) => update({ level: e.target.value })}
+                >
+                  <option value="">All levels</option>
+                  {HOSPITAL_LEVELS.map((level) => (
+                    <option key={level} value={level}>
+                      {HOSPITAL_LEVEL_LABELS[level]}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Referrals">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={state.accepting}
+                  onChange={(e) => update({ accepting: e.target.value })}
+                >
+                  <option value="">Accepting or not</option>
+                  <option value="yes">Accepting</option>
+                  <option value="no">On diversion</option>
+                </Select>
+              )}
+            </Field>
+            <div className="flex flex-wrap items-end gap-2">
+              {READINESS_STATUSES.map((status: ReadinessStatus) => (
+                <Chip
+                  key={status}
+                  active={state.readiness === status}
+                  onClick={() => update({ readiness: state.readiness === status ? '' : status })}
+                  tone={STATUS_TONE[status]}
+                >
+                  <StatusDot status={status} />
+                  {READINESS_LABELS[status]}
+                </Chip>
+              ))}
+            </div>
           </div>
-        </div>
+        </FilterBarAdvanced>
       </FilterBar>
 
       {hospitals.isPending ? (
         <Card>
-          <LoadingBlock label="Loading hospitals" rows={6} />
+          <TableSkeleton />
         </Card>
       ) : hospitals.isError ? (
         <ErrorBlock error={hospitals.error} onRetry={() => void hospitals.refetch()} />
@@ -285,7 +288,7 @@ export default function ConsoleHospitals() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <Table minWidth="64rem">
+          <Table responsive minWidth="64rem">
             <thead>
               <tr>
                 <Th>Hospital</Th>
@@ -309,7 +312,7 @@ export default function ConsoleHospitals() {
                     key={hospital.id}
                     className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                   >
-                    <Td>
+                    <Td cell="identity">
                       <div className="flex items-center gap-3">
                         <HospitalLogo hospital={hospital} size="md" />
                         <div className="min-w-0">
@@ -359,7 +362,7 @@ export default function ConsoleHospitals() {
                     <Td className="whitespace-nowrap text-slate-500 dark:text-slate-400">
                       {relativeTime(hospital.updated_at)}
                     </Td>
-                    <Td align="right">
+                    <Td align="right" cell="actions">
                       <div className="flex justify-end gap-1">
                         <Button
                           size="sm"

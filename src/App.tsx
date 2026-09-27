@@ -1,8 +1,21 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { RequireAuth, RedirectIfAuthenticated, RequireCapability } from '@/auth/RequireAuth'
-import { Spinner } from '@/components/ui'
+import { SplashScreen } from '@/components/brand/SplashScreen'
+import { Card, Spinner } from '@/components/ui'
+import {
+  DashboardSkeleton,
+  DetailPageSkeleton,
+  FormPageSkeleton,
+  ListPageSkeleton,
+  ListSkeleton,
+  NotificationsSkeleton,
+  PageHeaderSkeleton,
+  ReportsSkeleton,
+  StatGridSkeleton,
+  TabbedPageSkeleton,
+} from '@/components/ui/skeletons'
 
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
@@ -35,9 +48,34 @@ function PageFallback() {
   )
 }
 
+function ReadinessSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label="Loading readiness"
+      className="space-y-5 animate-fade-in"
+    >
+      <PageHeaderSkeleton />
+      <StatGridSkeleton count={4} />
+      <Card className="p-5">
+        <ListSkeleton rows={6} dense />
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * Each page downloads on first use and paints its own outline while it does,
+ * so the shell never collapses to a single spinner between screens.
+ */
+function Screen({ fallback, children }: { fallback: ReactNode; children: ReactNode }) {
+  return <Suspense fallback={fallback}>{children}</Suspense>
+}
+
 export default function App() {
   return (
-    <Suspense fallback={<PageFallback />}>
+    <Suspense fallback={<SplashScreen />}>
       <Routes>
         <Route
           path="/login"
@@ -56,13 +94,22 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route
+            index
+            element={
+              <Screen fallback={<DashboardSkeleton />}>
+                <DashboardPage />
+              </Screen>
+            }
+          />
 
           <Route
             path="readiness"
             element={
               <RequireCapability capability="readiness:view">
-                <ReadinessPage />
+                <Screen fallback={<ReadinessSkeleton />}>
+                  <ReadinessPage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -70,7 +117,9 @@ export default function App() {
             path="readiness/:departmentId"
             element={
               <RequireCapability capability="readiness:submit">
-                <ReadinessUpdatePage />
+                <Screen fallback={<FormPageSkeleton />}>
+                  <ReadinessUpdatePage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -79,7 +128,9 @@ export default function App() {
             path="referrals"
             element={
               <RequireCapability capability="referral:view">
-                <ReferralListPage />
+                <Screen fallback={<ListPageSkeleton view="list" filters={3} />}>
+                  <ReferralListPage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -87,7 +138,9 @@ export default function App() {
             path="referrals/new"
             element={
               <RequireCapability capability="referral:create">
-                <NewReferralPage />
+                <Screen fallback={<FormPageSkeleton steps />}>
+                  <NewReferralPage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -95,7 +148,9 @@ export default function App() {
             path="referrals/:referralId"
             element={
               <RequireCapability capability="referral:view">
-                <ReferralDetailPage />
+                <Screen fallback={<DetailPageSkeleton />}>
+                  <ReferralDetailPage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -104,7 +159,9 @@ export default function App() {
             path="hospitals"
             element={
               <RequireCapability capability="readiness:view">
-                <HospitalListPage />
+                <Screen fallback={<ListPageSkeleton view="cards" filters={5} />}>
+                  <HospitalListPage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -112,7 +169,9 @@ export default function App() {
             path="hospitals/:hospitalId"
             element={
               <RequireCapability capability="readiness:view">
-                <HospitalDetailPage />
+                <Screen fallback={<DetailPageSkeleton />}>
+                  <HospitalDetailPage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -121,18 +180,29 @@ export default function App() {
             path="reports"
             element={
               <RequireCapability capability="reports:view">
-                <ReportsPage />
+                <Screen fallback={<ReportsSkeleton />}>
+                  <ReportsPage />
+                </Screen>
               </RequireCapability>
             }
           />
 
-          <Route path="notifications" element={<NotificationsPage />} />
+          <Route
+            path="notifications"
+            element={
+              <Screen fallback={<NotificationsSkeleton />}>
+                <NotificationsPage />
+              </Screen>
+            }
+          />
 
           <Route
             path="admin/*"
             element={
               <RequireCapability capability="admin:hospital">
-                <AdminPage />
+                <Screen fallback={<TabbedPageSkeleton view="form" />}>
+                  <AdminPage />
+                </Screen>
               </RequireCapability>
             }
           />
@@ -140,12 +210,21 @@ export default function App() {
             path="console/*"
             element={
               <RequireCapability capability="admin:system">
-                <ConsolePage />
+                <Screen fallback={<TabbedPageSkeleton view="stats" />}>
+                  <ConsolePage />
+                </Screen>
               </RequireCapability>
             }
           />
 
-          <Route path="404" element={<NotFoundPage />} />
+          <Route
+            path="404"
+            element={
+              <Screen fallback={<PageFallback />}>
+                <NotFoundPage />
+              </Screen>
+            }
+          />
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Route>
 

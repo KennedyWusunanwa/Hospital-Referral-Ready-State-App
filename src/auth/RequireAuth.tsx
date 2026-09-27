@@ -2,16 +2,9 @@ import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { ShieldAlert } from 'lucide-react'
 import { useAuth } from './AuthProvider'
-import { Alert, Button, Card, Spinner } from '@/components/ui'
+import { SplashScreen } from '@/components/brand/SplashScreen'
+import { Alert, Button, Card } from '@/components/ui'
 import type { Capability } from '@/lib/constants'
-
-function FullScreenLoader() {
-  return (
-    <div className="flex h-full min-h-dvh items-center justify-center">
-      <Spinner className="h-8 w-8" />
-    </div>
-  )
-}
 
 /**
  * Gate for every authenticated route.
@@ -24,7 +17,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { session, profile, loading, profileError, signOut } = useAuth()
   const location = useLocation()
 
-  if (loading) return <FullScreenLoader />
+  if (loading) return <SplashScreen label="Signing you in" />
 
   if (!session) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
@@ -64,7 +57,7 @@ export function RequireCapability({
 }) {
   const { can, loading } = useAuth()
 
-  if (loading) return <FullScreenLoader />
+  if (loading) return <SplashScreen label="Loading" />
 
   if (!can(capability)) {
     return (
@@ -106,7 +99,7 @@ export function Gate({
 export function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   const location = useLocation()
-  if (loading) return <FullScreenLoader />
+  if (loading) return <SplashScreen label="Checking your session" />
   if (session) {
     const from = (location.state as { from?: string } | null)?.from
     return <Navigate to={from && from !== '/login' ? from : '/'} replace />
