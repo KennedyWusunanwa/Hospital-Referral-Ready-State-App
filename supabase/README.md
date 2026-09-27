@@ -11,6 +11,7 @@ and demo data.
 | `migrations/0004_seed.sql` | Eight Ghanaian facilities, their departments, resource snapshots, blood stock, twelve emergency types and a mixed readiness history. |
 | `migrations/0005_settings_and_invites.sql` | Network branding (`app_settings`), staff invitations and the signup trigger that applies them, the `before_user_created` auth hook, the `branding` storage bucket. |
 | `migrations/0006_platform_console.sql` | Hospital logos, light/dark network logos, the `login_events` sign-in log, `record_login(method, agent)` / `record_logout()`, `platform_stats()` for the system console, default resource rows for new hospitals, the `hospital-logos` storage bucket. |
+| `migrations/0007_hospital_logo_seed.sql` | Logos for the eight seeded facilities, served from `public/hospital-logos/`. Never overwrites a logo a hospital has uploaded itself. |
 | `config.toml` | Supabase CLI settings for local development. |
 
 `src/lib/database.types.ts` is a hand-maintained mirror of `0001_schema.sql`.
@@ -45,6 +46,7 @@ this order**, one at a time:
 4. `migrations/0004_seed.sql`
 5. `migrations/0005_settings_and_invites.sql`
 6. `migrations/0006_platform_console.sql`
+7. `migrations/0007_hospital_logo_seed.sql`
 
 Order matters: `0002` creates the helper functions the policies depend on, and
 `0003` calls those helpers. Every file is idempotent (`create ... if not

@@ -58,6 +58,7 @@ re-running one is safe.
 | 4 | `0004_seed.sql` | Reference data — the emergency-type catalogue with its weighted requirements, and demo hospitals/departments for a pilot |
 | 5 | `0005_settings_and_invites.sql` | `app_settings` (network branding, readable by anon), `staff_invites` and the signup trigger that applies them, the `before_user_created` auth hook, the public `branding` storage bucket |
 | 6 | `0006_platform_console.sql` | `hospitals.logo_url`, light/dark network logos on `app_settings`, the `login_events` sign-in log, `record_login(method, agent)` / `record_logout()`, `platform_stats()` for the system console, a trigger that gives a new hospital its resource rows, and the public `hospital-logos` storage bucket |
+| 7 | `0007_hospital_logo_seed.sql` | Points the eight seeded facilities at the logos shipped under `public/hospital-logos/` (sources listed in that folder's README). Skips any facility that already has a logo |
 
 Confirm the actual filenames present in `supabase/migrations/` before you start; apply every file
 you find there, in ascending filename order.

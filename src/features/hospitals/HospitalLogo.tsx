@@ -5,12 +5,20 @@ import { cn } from '@/lib/utils'
 
 export type HospitalLogoSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
-const SIZES: Record<HospitalLogoSize, { box: string; text: string; radius: string }> = {
-  xs: { box: 'h-6 w-6', text: 'text-[9px]', radius: 'rounded-md' },
-  sm: { box: 'h-8 w-8', text: 'text-[10px]', radius: 'rounded-lg' },
-  md: { box: 'h-10 w-10', text: 'text-xs', radius: 'rounded-lg' },
-  lg: { box: 'h-14 w-14', text: 'text-sm', radius: 'rounded-xl' },
-  xl: { box: 'h-20 w-20', text: 'text-base', radius: 'rounded-2xl' },
+const SIZES: Record<
+  HospitalLogoSize,
+  { box: string; frame: string; text: string; radius: string }
+> = {
+  xs: { box: 'h-6 w-6', frame: 'h-6 min-w-6 max-w-14', text: 'text-[9px]', radius: 'rounded-md' },
+  sm: { box: 'h-8 w-8', frame: 'h-8 min-w-8 max-w-20', text: 'text-[10px]', radius: 'rounded-lg' },
+  md: { box: 'h-10 w-10', frame: 'h-10 min-w-10 max-w-24', text: 'text-xs', radius: 'rounded-lg' },
+  lg: { box: 'h-14 w-14', frame: 'h-14 min-w-14 max-w-36', text: 'text-sm', radius: 'rounded-xl' },
+  xl: {
+    box: 'h-20 w-20',
+    frame: 'h-20 min-w-20 max-w-52',
+    text: 'text-base',
+    radius: 'rounded-2xl',
+  },
 }
 
 export interface HospitalLogoProps {
@@ -25,7 +33,9 @@ export interface HospitalLogoProps {
  * A facility's logo, or a deterministic monogram tile when it has none.
  *
  * Uploaded logos sit on a white tile with a hairline border, because most
- * hospital crests are designed for paper and disappear on a dark surface.
+ * hospital crests are designed for paper and disappear on a dark surface. The
+ * tile is square for a crest and widens (to about 2.5 times its height) for a
+ * horizontal lockup, so a wordmark is not squeezed into a postage stamp.
  */
 export function HospitalLogo({
   hospital,
@@ -43,8 +53,8 @@ export function HospitalLogo({
     return (
       <span
         className={cn(
-          'inline-grid shrink-0 place-items-center overflow-hidden border border-slate-200 bg-white p-0.5 dark:border-slate-700',
-          dims.box,
+          'inline-flex shrink-0 items-center justify-center overflow-hidden border border-slate-200 bg-white p-0.5 dark:border-slate-700',
+          dims.frame,
           dims.radius,
           className,
         )}
@@ -56,7 +66,7 @@ export function HospitalLogo({
           loading="lazy"
           draggable={false}
           onError={() => setBroken(url)}
-          className="h-full w-full object-contain"
+          className="h-full w-auto max-w-full object-contain"
         />
       </span>
     )

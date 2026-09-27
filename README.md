@@ -38,7 +38,7 @@ number. See [docs/SECURITY.md](docs/SECURITY.md).
 | Administration | Hospital administrators manage their own facility: details and logo, departments, staff and invitations, audit log |
 | System console | Network-wide administration for system administrators: platform statistics with 14-day trends, every hospital (create, edit, logos, departments, diversion and active flags), every account across the three access levels, the sign-in log, the emergency catalogue and its weighted requirements, scoring, branding and the full audit trail |
 | Search everywhere | Ctrl+K / ⌘K command palette over hospitals, referrals, departments, people and pages; URL-synced filters, sorting and search on every list so a view can be bookmarked or shared |
-| Identity | Three access levels (System, Hospital, Department) over five roles; per-facility logos with deterministic monogram fallbacks; light and dark network logos that follow the viewer's theme; System / Light / Dark theme preference |
+| Identity | Three access levels (System, Hospital, Department) over five roles; per-facility logos (the eight seeded Ghanaian hospitals ship with theirs, see `public/hospital-logos/README.md`) with deterministic monogram fallbacks; light and dark network logos that follow the viewer's theme; System / Light / Dark theme preference |
 | Security | Supabase Auth with PKCE, five roles in three access levels, a capability matrix in the UI and Postgres row-level security as the real boundary, append-only audit trail, per-sign-in log with method, device and address |
 
 ### Access levels
