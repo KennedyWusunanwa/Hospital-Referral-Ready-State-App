@@ -8,6 +8,8 @@
  * needing eleven colour pickers.
  */
 
+import { BUILT_IN_LOGOS, type LogoMode } from './constants'
+
 export const DEFAULT_BRAND_COLOR = '#1b5cf5'
 
 export type Rgb = [number, number, number]
@@ -170,6 +172,8 @@ export function applyBrandColor(hex: string): void {
   }
   const [fr, fg, fb] = readableForeground(scale[600])
   root.style.setProperty('--brand-fg', `${fr} ${fg} ${fb}`)
+  // The address-bar colour follows brand-600 on light surfaces.
+  root.dispatchEvent(new CustomEvent('fern:brand-color'))
 }
 
 /** Restores the compiled-in defaults by removing the inline overrides. */
@@ -184,7 +188,12 @@ const CACHE_KEY = 'fern.branding'
 
 export interface CachedBranding {
   brandColor: string
+  /** Logo for light surfaces (dark artwork), or null for the built-in wordmark. */
   logoUrl: string | null
+  /** Logo for dark surfaces (light artwork), or null for the built-in wordmark. */
+  logoDarkUrl: string | null
+  /** `auto` follows the theme; `light` / `dark` pin one variant. */
+  logoMode: 'auto' | 'light' | 'dark'
   appName: string
   appTagline: string
 }
@@ -200,9 +209,12 @@ export function readCachedBranding(): CachedBranding | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<CachedBranding>
     if (!parsed.brandColor || !isValidHex(parsed.brandColor)) return null
+    const mode = parsed.logoMode
     return {
       brandColor: parsed.brandColor,
       logoUrl: parsed.logoUrl ?? null,
+      logoDarkUrl: parsed.logoDarkUrl ?? null,
+      logoMode: mode === 'light' || mode === 'dark' ? mode : 'auto',
       appName: parsed.appName ?? 'FERN',
       appTagline: parsed.appTagline ?? '',
     }
@@ -223,4 +235,70 @@ export function writeCachedBranding(value: CachedBranding): void {
 export function initBranding(): void {
   const cached = readCachedBranding()
   applyBrandColor(cached?.brandColor ?? DEFAULT_BRAND_COLOR)
+}
+
+// ---------------------------------------------------------------------------
+// Logo resolution
+// ---------------------------------------------------------------------------
+
+/** Which artwork a surface needs: `light` surfaces want dark ink and vice versa. */
+export type LogoVariant = 'light' | 'dark'
+
+export interface LogoSettings {
+  /** Custom logo for light surfaces, or null for the built-in wordmark. */
+  logoUrl: string | null
+  /** Custom logo for dark surfaces, or null for the built-in wordmark. */
+  logoDarkUrl: string | null
+  logoMode: LogoMode
+}
+
+export interface ResolvedLogo {
+  src: string
+  variant: LogoVariant
+  /** True when the built-in FERN artwork is being used rather than an upload. */
+  builtIn: boolean
+}
+
+export function toLogoMode(value: string | null | undefined): LogoMode {
+  return value === 'light' || value === 'dark' ? value : 'auto'
+}
+
+/**
+ * Picks the logo for a surface.
+ *
+ * @param settings The network's logo settings.
+ * @param theme    The theme currently painted.
+ * @param surface  `auto` follows the theme; a coloured panel passes `dark`
+ *                 because it is dark whatever the theme is.
+ * @param kind     `mark` asks for the square emblem; only the built-in art has
+ *                 one, so a custom wordmark is returned instead.
+ */
+export function resolveLogo(
+  settings: LogoSettings,
+  theme: 'light' | 'dark',
+  surface: 'auto' | LogoVariant = 'auto',
+  kind: 'wordmark' | 'mark' = 'wordmark',
+): ResolvedLogo {
+  const wanted: LogoVariant =
+    settings.logoMode !== 'auto' ? settings.logoMode : surface === 'auto' ? theme : surface
+
+  const custom =
+    wanted === 'dark'
+      ? (settings.logoDarkUrl ?? settings.logoUrl)
+      : (settings.logoUrl ?? settings.logoDarkUrl)
+
+  if (custom) return { src: custom, variant: wanted, builtIn: false }
+
+  if (kind === 'mark') {
+    return {
+      src: wanted === 'dark' ? BUILT_IN_LOGOS.markDark : BUILT_IN_LOGOS.markLight,
+      variant: wanted,
+      builtIn: true,
+    }
+  }
+  return {
+    src: wanted === 'dark' ? BUILT_IN_LOGOS.dark : BUILT_IN_LOGOS.light,
+    variant: wanted,
+    builtIn: true,
+  }
 }

@@ -27,6 +27,8 @@ export const queryKeys = {
 
   readiness: {
     all: ['readiness'] as const,
+    /** Every hospital's department rows in one fetch, for directory filters and the network board. */
+    network: ['readiness', 'network'] as const,
     history: (departmentId: string, days: number) =>
       ['readiness', 'history', departmentId, days] as const,
     currentShift: (departmentId: string) => ['readiness', 'current-shift', departmentId] as const,
@@ -71,5 +73,15 @@ export const queryKeys = {
     invites: (hospitalId?: string | null) => ['admin', 'invites', hospitalId ?? 'all'] as const,
     auditLogs: (filters: Record<string, unknown>) => ['admin', 'audit-logs', filters] as const,
     scoringConfig: ['admin', 'scoring-config'] as const,
+    /** Emergency catalogue including retired types -- the ordinary list hides them. */
+    emergencyCatalogue: ['admin', 'emergency-catalogue'] as const,
+  },
+
+  /** The system console: network-wide, super administrators only. */
+  console: {
+    all: ['console'] as const,
+    stats: ['console', 'stats'] as const,
+    loginEvents: (filters: Record<string, unknown>) =>
+      ['console', 'login-events', filters] as const,
   },
 } as const

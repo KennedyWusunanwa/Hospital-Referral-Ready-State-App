@@ -1,18 +1,16 @@
 import { lazy, Suspense } from 'react'
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { Building2, ClipboardList, Palette, ScrollText, SlidersHorizontal, Users } from 'lucide-react'
+import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { ArrowRight, Building2, ClipboardList, ScrollText, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { Gate } from '@/auth/RequireAuth'
-import { Card, PageHeader, Spinner } from '@/components/ui'
+import { Card, CardBody, PageHeader, Spinner } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { Capability } from '@/lib/constants'
 
 const HospitalSettings = lazy(() => import('./HospitalSettings'))
 const DepartmentManager = lazy(() => import('./DepartmentManager'))
 const StaffManager = lazy(() => import('./StaffManager'))
-const ScoringSettings = lazy(() => import('./ScoringSettings'))
 const AuditLogViewer = lazy(() => import('./AuditLogViewer'))
-const AppearanceSettings = lazy(() => import('./AppearanceSettings'))
 
 interface AdminTab {
   to: string
@@ -25,8 +23,6 @@ const TABS: AdminTab[] = [
   { to: '/admin/hospital', label: 'Hospital', icon: Building2 },
   { to: '/admin/departments', label: 'Departments', icon: ClipboardList },
   { to: '/admin/staff', label: 'Staff', icon: Users },
-  { to: '/admin/scoring', label: 'Scoring', icon: SlidersHorizontal, capability: 'admin:system' },
-  { to: '/admin/appearance', label: 'Appearance', icon: Palette, capability: 'admin:system' },
   { to: '/admin/audit', label: 'Audit log', icon: ScrollText, capability: 'audit:view' },
 ]
 
@@ -43,11 +39,10 @@ function NotPermitted() {
   return (
     <Card className="p-8 text-center">
       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-        Restricted to system administrators
+        Not available for your role
       </p>
       <p className="mx-auto mt-1 max-w-md hint">
-        These settings change how referrals are ranked for every hospital on the network, so they
-        are only editable by a system administrator.
+        Ask your hospital administrator if you believe you should have access to this section.
       </p>
     </Card>
   )
@@ -60,13 +55,42 @@ export default function AdminPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Administration"
+        title="Hospital administration"
         description={
           hospital
             ? `Settings, departments and staff for ${hospital.name}.`
-            : 'Settings, departments and staff.'
+            : 'Settings, departments and staff for your facility.'
         }
       />
+
+      {can('admin:system') && (
+        <Card className="border-brand-200 bg-brand-50/60 dark:border-brand-900 dark:bg-brand-950/30">
+          <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <ShieldCheck
+                className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400"
+                aria-hidden
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  Network-wide settings live in the system console
+                </p>
+                <p className="mt-0.5 hint">
+                  Every hospital, every account, sign-ins, the emergency catalogue, scoring,
+                  branding and the full audit trail.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/console"
+              className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-brand-700 hover:underline dark:text-brand-300"
+            >
+              Open the console
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </CardBody>
+        </Card>
+      )}
 
       <nav
         aria-label="Administration sections"
@@ -98,22 +122,6 @@ export default function AdminPage() {
           <Route path="departments" element={<DepartmentManager />} />
           <Route path="staff" element={<StaffManager />} />
           <Route
-            path="scoring"
-            element={
-              <Gate capability="admin:system" fallback={<NotPermitted />}>
-                <ScoringSettings />
-              </Gate>
-            }
-          />
-          <Route
-            path="appearance"
-            element={
-              <Gate capability="admin:system" fallback={<NotPermitted />}>
-                <AppearanceSettings />
-              </Gate>
-            }
-          />
-          <Route
             path="audit"
             element={
               <Gate capability="audit:view" fallback={<NotPermitted />}>
@@ -121,6 +129,9 @@ export default function AdminPage() {
               </Gate>
             }
           />
+          {/* Network-wide settings moved to the console; old bookmarks still land. */}
+          <Route path="scoring" element={<Navigate to="/console/scoring" replace />} />
+          <Route path="appearance" element={<Navigate to="/console/appearance" replace />} />
           <Route path="*" element={<Navigate to="/admin/hospital" replace />} />
         </Routes>
       </Suspense>

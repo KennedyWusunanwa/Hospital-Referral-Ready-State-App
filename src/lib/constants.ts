@@ -77,6 +77,52 @@ export const ROLE_CAPABILITIES = {
 export type Capability = (typeof ROLE_CAPABILITIES)[UserRole][number]
 
 // ---------------------------------------------------------------------------
+// Access tiers -- the three levels people are managed at.
+//
+// The five roles above are what the database enforces (see 0002_rls.sql);
+// the tiers are how administrators think about them: the platform, one
+// facility, or one department inside a facility. A tier never grants
+// anything by itself -- it groups roles for invitations, filters and labels.
+// ---------------------------------------------------------------------------
+
+export const ROLE_TIERS = ['system', 'hospital', 'department'] as const
+export type RoleTier = (typeof ROLE_TIERS)[number]
+
+export const ROLE_TIER_OF: Record<UserRole, RoleTier> = {
+  super_admin: 'system',
+  hospital_admin: 'hospital',
+  referral_coordinator: 'hospital',
+  viewer: 'hospital',
+  shift_in_charge: 'department',
+}
+
+export const ROLES_BY_TIER: Record<RoleTier, readonly UserRole[]> = {
+  system: ['super_admin'],
+  hospital: ['hospital_admin', 'referral_coordinator', 'viewer'],
+  department: ['shift_in_charge'],
+}
+
+export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
+  system: 'System',
+  hospital: 'Hospital',
+  department: 'Department',
+}
+
+export const ROLE_TIER_DESCRIPTIONS: Record<RoleTier, string> = {
+  system:
+    'Runs the platform for every facility: hospitals, accounts, the emergency catalogue, scoring, branding and the network-wide audit trail.',
+  hospital:
+    'Scoped to one facility: its settings, departments and staff, the referrals it sends and receives, and its reports.',
+  department:
+    'Scoped to one department in one facility: files the readiness update every shift and follows referrals that concern it.',
+}
+
+/** Short label for a role, prefixed with its tier: "Hospital · Administrator". */
+export function roleTierLabel(role: UserRole): string {
+  return `${ROLE_TIER_LABELS[ROLE_TIER_OF[role]]} · ${ROLE_LABELS[role]}`
+}
+
+// ---------------------------------------------------------------------------
 // Readiness status
 // ---------------------------------------------------------------------------
 
@@ -664,6 +710,11 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 // ---------------------------------------------------------------------------
 
 export const APP_NAME = import.meta.env?.VITE_APP_NAME || 'FERN'
+/** Canonical public origin. The temporary Vercel host until the national domain is bought. */
+export const APP_URL = (import.meta.env?.VITE_APP_URL || 'https://hospital-ref.vercel.app').replace(
+  /\/+$/,
+  '',
+)
 export const APP_TAGLINE = 'Referral Ready State'
 export const SUPPORT_EMAIL = import.meta.env?.VITE_SUPPORT_EMAIL || 'support@example.org'
 
@@ -672,3 +723,67 @@ export const REFERRAL_RESPONSE_TARGET_MINUTES = 15
 
 /** Free-text clinical summary cap -- keeps records terse and PHI-light. */
 export const CLINICAL_SUMMARY_MAX_LENGTH = 1000
+
+// ---------------------------------------------------------------------------
+// Branding assets
+// ---------------------------------------------------------------------------
+
+/**
+ * The built-in FERN artwork, used whenever the network has not uploaded its
+ * own. "light" is the dark-ink version for light surfaces; "dark" is the
+ * white version for dark surfaces and the coloured sign-in panel.
+ */
+export const BUILT_IN_LOGOS = {
+  light: '/brand/fern-logo-light.png',
+  dark: '/brand/fern-logo-dark.png',
+  markLight: '/brand/fern-mark-light.png',
+  markDark: '/brand/fern-mark-dark.png',
+  share: '/brand/og-image.png',
+} as const
+
+export const LOGO_MODES = ['auto', 'light', 'dark'] as const
+export type LogoMode = (typeof LOGO_MODES)[number]
+
+export const LOGO_MODE_LABELS: Record<LogoMode, string> = {
+  auto: 'Follow the theme',
+  light: 'Always the light-surface logo',
+  dark: 'Always the dark-surface logo',
+}
+
+// ---------------------------------------------------------------------------
+// Sign-in methods, as recorded by record_login()
+// ---------------------------------------------------------------------------
+
+export const LOGIN_METHODS = ['password', 'otp', 'recovery', 'unknown'] as const
+export type LoginMethod = (typeof LOGIN_METHODS)[number]
+
+export const LOGIN_METHOD_LABELS: Record<LoginMethod, string> = {
+  password: 'Password',
+  otp: 'Email code',
+  recovery: 'Recovery link',
+  unknown: 'Unknown',
+}
+
+// ---------------------------------------------------------------------------
+// Geography
+// ---------------------------------------------------------------------------
+
+/** The sixteen administrative regions of Ghana, offered as suggestions on hospital forms. */
+export const GHANA_REGIONS = [
+  'Ahafo',
+  'Ashanti',
+  'Bono',
+  'Bono East',
+  'Central',
+  'Eastern',
+  'Greater Accra',
+  'North East',
+  'Northern',
+  'Oti',
+  'Savannah',
+  'Upper East',
+  'Upper West',
+  'Volta',
+  'Western',
+  'Western North',
+] as const

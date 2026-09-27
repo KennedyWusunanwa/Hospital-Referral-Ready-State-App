@@ -1,25 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Download, Filter, Inbox, Plus, RotateCcw, Search } from 'lucide-react'
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Download,
+  Inbox,
+  Layers,
+  Plus,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Gate } from '@/auth/RequireAuth'
 import { useAuth, useCurrentHospitalId } from '@/auth/AuthProvider'
 import {
   Button,
-  Card,
-  CardBody,
+  Chip,
   EmptyState,
   ErrorBlock,
   Field,
+  FilterBar,
   Input,
   LoadingBlock,
   Modal,
   PageHeader,
+  SearchInput,
+  SegmentedControl,
   Select,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
   Textarea,
 } from '@/components/ui'
 import {
@@ -31,6 +37,7 @@ import {
 import type { ReferralStatus, UrgencyLevel } from '@/lib/constants'
 import { humanizeSupabaseError, supabase } from '@/lib/supabase'
 import type { ReferralWithRelations } from '@/lib/types'
+import { useUrlState } from '@/lib/useUrlState'
 import { cn, downloadCsv, formatDateTime, isReferralOverdue, toCsv } from '@/lib/utils'
 import { ReferralCard } from './ReferralCard'
 import {
@@ -42,6 +49,21 @@ import {
 } from './useReferrals'
 
 type DirectionTab = 'incoming' | 'outgoing' | 'all'
+type SortKey = 'newest' | 'oldest' | 'urgency' | 'waiting'
+
+const FILTER_DEFAULTS = {
+  q: '',
+  tab: 'incoming',
+  status: [] as string[],
+  urgency: 'all',
+  type: 'all',
+  hospital: '',
+  from: '',
+  to: '',
+  sort: 'newest',
+}
+
+const URGENCY_ORDER: Record<UrgencyLevel, number> = { critical: 0, urgent: 1, routine: 2 }
 
 /** `<input type="date">` gives a local calendar day; widen it to a full day. */
 function dayStartIso(day: string): string | undefined {
@@ -69,14 +91,11 @@ export default function ReferralListPage() {
     return () => window.clearInterval(id)
   }, [])
 
-  const [tab, setTab] = useState<DirectionTab>('incoming')
-  const [statuses, setStatuses] = useState<ReferralStatus[]>([])
-  const [urgency, setUrgency] = useState<UrgencyLevel | 'all'>('all')
-  const [emergencyTypeId, setEmergencyTypeId] = useState('all')
-  const [fromDay, setFromDay] = useState('')
-  const [toDay, setToDay] = useState('')
-  const [search, setSearch] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
+  const { state, update, reset } = useUrlState(FILTER_DEFAULTS)
+  const [moreOpen, setMoreOpen] = useState(false)
+
+  const statuses = state.status as ReferralStatus[]
+  const sort = state.sort as SortKey
 
   const emergencyTypes = useEmergencyTypes()
 
@@ -86,8 +105,8 @@ export default function ReferralListPage() {
     hospitalId,
     direction: 'all',
     status: statuses.length > 0 ? statuses : undefined,
-    from: dayStartIso(fromDay),
-    to: dayEndIso(toDay),
+    from: dayStartIso(state.from),
+    to: dayEndIso(state.to),
   })
 
   const updateStatus = useUpdateReferralStatus()
@@ -98,20 +117,48 @@ export default function ReferralListPage() {
   const directionOf = (referral: ReferralWithRelations): 'incoming' | 'outgoing' =>
     hospitalId && referral.receiving_hospital_id === hospitalId ? 'incoming' : 'outgoing'
 
+  /** Hospitals that appear on the loaded referrals, for the counterpart filter. */
+  const counterparts = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const referral of referrals.data ?? []) {
+      for (const hospital of [referral.requesting_hospital, referral.receiving_hospital]) {
+        if (hospital && hospital.id !== hospitalId) seen.set(hospital.id, hospital.name)
+      }
+    }
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [referrals.data, hospitalId])
+
   const filtered = useMemo(() => {
     const rows = referrals.data ?? []
-    const needle = search.trim().toLowerCase()
+    const needle = state.q.trim().toLowerCase()
 
     return rows.filter((referral) => {
-      if (urgency !== 'all' && referral.urgency !== urgency) return false
-      if (emergencyTypeId !== 'all' && referral.emergency_type_id !== emergencyTypeId) return false
+      if (state.urgency !== 'all' && referral.urgency !== state.urgency) return false
+      if (state.type !== 'all' && referral.emergency_type_id !== state.type) return false
+      if (
+        state.hospital &&
+        referral.requesting_hospital_id !== state.hospital &&
+        referral.receiving_hospital_id !== state.hospital
+      ) {
+        return false
+      }
       if (needle) {
-        const haystack = `${referral.reference_number} ${referral.clinical_summary}`.toLowerCase()
+        const haystack = [
+          referral.reference_number,
+          referral.patient_ref,
+          referral.clinical_summary,
+          referral.emergency_type?.name ?? '',
+          referral.requesting_hospital?.name ?? '',
+          referral.receiving_hospital?.name ?? '',
+          referral.requested_by_profile?.full_name ?? '',
+        ]
+          .join(' ')
+          .toLowerCase()
         if (!haystack.includes(needle)) return false
       }
       return true
     })
-  }, [referrals.data, search, urgency, emergencyTypeId])
+  }, [referrals.data, state.q, state.urgency, state.type, state.hospital])
 
   const buckets = useMemo(() => {
     const incoming: ReferralWithRelations[] = []
@@ -121,53 +168,71 @@ export default function ReferralListPage() {
       else outgoing.push(referral)
     }
 
+    const requestedAt = (referral: ReferralWithRelations) =>
+      new Date(referral.requested_at).getTime()
+    const byNewest = (a: ReferralWithRelations, b: ReferralWithRelations) =>
+      requestedAt(b) - requestedAt(a)
+
+    const comparator = (a: ReferralWithRelations, b: ReferralWithRelations): number => {
+      switch (sort) {
+        case 'oldest':
+          return requestedAt(a) - requestedAt(b)
+        case 'urgency':
+          return URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency] || byNewest(a, b)
+        case 'waiting': {
+          // Unanswered first, longest wait at the top.
+          const aOpen = a.status === 'pending' ? 0 : 1
+          const bOpen = b.status === 'pending' ? 0 : 1
+          return aOpen - bOpen || requestedAt(a) - requestedAt(b)
+        }
+        default:
+          return byNewest(a, b)
+      }
+    }
+
     // Newest first everywhere, but an unanswered incoming referral is the whole
     // point of the screen, so float the overdue ones above the rest.
-    const byRecency = (a: ReferralWithRelations, b: ReferralWithRelations) =>
-      new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime()
-
-    const urgencyFirst = (a: ReferralWithRelations, b: ReferralWithRelations) => {
+    const overdueFirst = (a: ReferralWithRelations, b: ReferralWithRelations) => {
       const aOverdue = a.status === 'pending' && isReferralOverdue(a.requested_at, now)
       const bOverdue = b.status === 'pending' && isReferralOverdue(b.requested_at, now)
       if (aOverdue !== bOverdue) return aOverdue ? -1 : 1
-      return byRecency(a, b)
+      return comparator(a, b)
     }
 
     return {
-      incoming: [...incoming].sort(urgencyFirst),
-      outgoing: [...outgoing].sort(byRecency),
-      all: [...filtered].sort(byRecency),
+      incoming: [...incoming].sort(sort === 'newest' ? overdueFirst : comparator),
+      outgoing: [...outgoing].sort(comparator),
+      all: [...filtered].sort(comparator),
     }
-  }, [filtered, hospitalId, now])
+  }, [filtered, hospitalId, now, sort])
 
   // A super_admin has no home hospital, so the direction split is meaningless.
-  const activeTab: DirectionTab = hospitalId ? tab : 'all'
+  const activeTab: DirectionTab = hospitalId ? (state.tab as DirectionTab) : 'all'
   const visible = buckets[activeTab]
   const overdueCount = buckets.incoming.filter(
     (referral) => referral.status === 'pending' && isReferralOverdue(referral.requested_at, now),
   ).length
 
-  const hasFilters =
-    statuses.length > 0 ||
-    urgency !== 'all' ||
-    emergencyTypeId !== 'all' ||
-    fromDay !== '' ||
-    toDay !== '' ||
-    search !== ''
-
-  function resetFilters() {
-    setStatuses([])
-    setUrgency('all')
-    setEmergencyTypeId('all')
-    setFromDay('')
-    setToDay('')
-    setSearch('')
-  }
+  const activeFilters =
+    (state.q ? 1 : 0) +
+    (statuses.length > 0 ? 1 : 0) +
+    (state.urgency !== 'all' ? 1 : 0) +
+    (state.type !== 'all' ? 1 : 0) +
+    (state.hospital ? 1 : 0) +
+    (state.from ? 1 : 0) +
+    (state.to ? 1 : 0)
+  const hasFilters = activeFilters > 0
 
   function toggleStatus(status: ReferralStatus) {
-    setStatuses((current) =>
-      current.includes(status) ? current.filter((s) => s !== status) : [...current, status],
-    )
+    update({
+      status: statuses.includes(status)
+        ? statuses.filter((value) => value !== status)
+        : [...statuses, status],
+    })
+  }
+
+  function clearFilters() {
+    reset(['tab', 'sort'])
   }
 
   async function respond(
@@ -235,11 +300,21 @@ export default function ReferralListPage() {
       p_action: 'report.export',
       p_entity_type: 'referrals',
       p_entity_id: null,
-      p_details: { scope: activeTab, rows: rows.length, filters: { statuses, urgency, emergencyTypeId } },
+      p_details: {
+        scope: activeTab,
+        rows: rows.length,
+        filters: { statuses, urgency: state.urgency, emergencyTypeId: state.type },
+      },
     })
     if (error) toast.error(humanizeSupabaseError(error))
     else toast.success(`Exported ${rows.length} referrals.`)
   }
+
+  const summary = referrals.data
+    ? `${visible.length} ${visible.length === 1 ? 'referral' : 'referrals'}${
+        hasFilters ? ' match' : ''
+      }${overdueCount > 0 && activeTab === 'incoming' ? ` · ${overdueCount} overdue` : ''}`
+    : undefined
 
   return (
     <div className="space-y-5">
@@ -252,20 +327,6 @@ export default function ReferralListPage() {
         }
         actions={
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters((open) => !open)}
-              aria-expanded={showFilters}
-            >
-              <Filter className="h-4 w-4" aria-hidden />
-              Filters
-              {hasFilters && (
-                <span className="ml-1 rounded-full bg-brand-600 px-1.5 text-xs text-white">
-                  on
-                </span>
-              )}
-            </Button>
             <Gate capability="reports:view">
               <Button variant="outline" size="sm" onClick={() => void exportCsv()}>
                 <Download className="h-4 w-4" aria-hidden />
@@ -284,208 +345,227 @@ export default function ReferralListPage() {
         }
       />
 
-      {showFilters && (
-        <Card>
-          <CardBody className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Search" className="sm:col-span-2" hint="Reference number or summary text">
-              {({ id, describedBy }) => (
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                    aria-hidden
-                  />
-                  <Input
-                    id={id}
-                    aria-describedby={describedBy}
-                    className="pl-9"
-                    type="search"
-                    placeholder="REF-000123 or 'head injury'"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                  />
-                </div>
-              )}
-            </Field>
-
-            <Field label="Urgency">
-              {({ id, describedBy }) => (
-                <Select
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={urgency}
-                  onChange={(event) => setUrgency(event.target.value as UrgencyLevel | 'all')}
-                >
-                  <option value="all">Any urgency</option>
-                  {URGENCY_LEVELS.map((level) => (
-                    <option key={level} value={level}>
-                      {URGENCY_LABELS[level]}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-
-            <Field label="Emergency type">
-              {({ id, describedBy }) => (
-                <Select
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={emergencyTypeId}
-                  onChange={(event) => setEmergencyTypeId(event.target.value)}
-                  disabled={emergencyTypes.isLoading}
-                >
-                  <option value="all">Any emergency type</option>
-                  {(emergencyTypes.data ?? []).map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-
-            <Field label="Requested from">
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  aria-describedby={describedBy}
-                  type="date"
-                  value={fromDay}
-                  max={toDay || undefined}
-                  onChange={(event) => setFromDay(event.target.value)}
-                />
-              )}
-            </Field>
-
-            <Field label="Requested to">
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  aria-describedby={describedBy}
-                  type="date"
-                  value={toDay}
-                  min={fromDay || undefined}
-                  onChange={(event) => setToDay(event.target.value)}
-                />
-              )}
-            </Field>
-
-            <fieldset className="sm:col-span-2 lg:col-span-4">
-              <legend className="mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">
-                Status
-              </legend>
-              <div className="flex flex-wrap gap-2">
-                {REFERRAL_STATUSES.map((status) => {
-                  const active = statuses.includes(status)
-                  return (
-                    <button
-                      key={status}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => toggleStatus(status)}
-                      className={cn(
-                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                        active
-                          ? 'border-brand-600 bg-brand-600 text-white'
-                          : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600',
-                      )}
-                    >
-                      {REFERRAL_STATUS_LABELS[status]}
-                    </button>
-                  )
-                })}
-              </div>
-            </fieldset>
-
-            {hasFilters && (
-              <div className="sm:col-span-2 lg:col-span-4">
-                <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  <RotateCcw className="h-4 w-4" aria-hidden />
-                  Clear filters
-                </Button>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      <Tabs
-        value={activeTab}
-        defaultValue={activeTab}
-        onValueChange={(value) => setTab(value as DirectionTab)}
+      <FilterBar
+        activeCount={activeFilters}
+        onClear={clearFilters}
+        summary={summary}
+        gridClassName="space-y-3"
       >
-        <TabList>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           {hospitalId && (
-            <Tab value="incoming" count={buckets.incoming.length}>
-              Incoming
-            </Tab>
+            <SegmentedControl
+              ariaLabel="Direction"
+              value={activeTab}
+              onChange={(next) => update({ tab: next })}
+              options={[
+                {
+                  value: 'incoming',
+                  label: 'Incoming',
+                  icon: <ArrowDownLeft className="h-4 w-4" aria-hidden />,
+                  count: buckets.incoming.length,
+                },
+                {
+                  value: 'outgoing',
+                  label: 'Outgoing',
+                  icon: <ArrowUpRight className="h-4 w-4" aria-hidden />,
+                  count: buckets.outgoing.length,
+                },
+                {
+                  value: 'all',
+                  label: 'All',
+                  icon: <Layers className="h-4 w-4" aria-hidden />,
+                  count: buckets.all.length,
+                },
+              ]}
+            />
           )}
-          {hospitalId && (
-            <Tab value="outgoing" count={buckets.outgoing.length}>
-              Outgoing
-            </Tab>
-          )}
-          <Tab value="all" count={buckets.all.length}>
-            All
-          </Tab>
-        </TabList>
-
-        <div className="pt-4">
-          {referrals.isLoading ? (
-            <LoadingBlock label="Loading referrals" rows={4} />
-          ) : referrals.isError ? (
-            <ErrorBlock error={referrals.error} onRetry={() => void referrals.refetch()} />
-          ) : (
-            <TabPanel value={activeTab}>
-              {visible.length === 0 ? (
-                <EmptyState
-                  icon={<Inbox className="h-6 w-6" aria-hidden />}
-                  title={hasFilters ? 'No referrals match these filters' : 'No referrals yet'}
-                  description={
-                    hasFilters
-                      ? 'Try widening the date range or clearing the status filter.'
-                      : activeTab === 'incoming'
-                        ? 'Referrals sent to your hospital will appear here the moment they are raised.'
-                        : 'Referrals you raise will be tracked here from request to completion.'
-                  }
-                  action={
-                    hasFilters ? (
-                      <Button variant="outline" size="sm" onClick={resetFilters}>
-                        Clear filters
-                      </Button>
-                    ) : (
-                      <Gate capability="referral:create">
-                        <Link to="/referrals/new">
-                          <Button size="sm">New referral</Button>
-                        </Link>
-                      </Gate>
-                    )
-                  }
-                />
-              ) : (
-                <ul className="space-y-3">
-                  {visible.map((referral) => (
-                    <li key={referral.id}>
-                      <ReferralCard
-                        referral={referral}
-                        direction={directionOf(referral)}
-                        canRespond={can('referral:respond')}
-                        busy={busyId === referral.id}
-                        now={now}
-                        onAccept={(target) => void respond(target, 'accepted')}
-                        onDecline={(target) => {
-                          setDeclineReason('')
-                          setDeclining(target)
-                        }}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </TabPanel>
-          )}
+          <SearchInput
+            containerClassName="flex-1"
+            value={state.q}
+            onChange={(value) => update({ q: value })}
+            placeholder="Reference, patient code, hospital, emergency or summary text"
+            aria-label="Search referrals"
+          />
+          <div className="flex items-center gap-2">
+            <Select
+              aria-label="Sort referrals"
+              value={sort}
+              onChange={(event) => update({ sort: event.target.value })}
+              className="sm:w-44"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="urgency">Most urgent first</option>
+              <option value="waiting">Longest waiting first</option>
+            </Select>
+            <Button
+              variant="outline"
+              size="md"
+              className="lg:hidden"
+              onClick={() => setMoreOpen((open) => !open)}
+              aria-expanded={moreOpen}
+            >
+              <SlidersHorizontal className="h-4 w-4" aria-hidden />
+              Filters
+            </Button>
+          </div>
         </div>
-      </Tabs>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Status</span>
+          {REFERRAL_STATUSES.map((status) => (
+            <Chip
+              key={status}
+              active={statuses.includes(status)}
+              onClick={() => toggleStatus(status)}
+              tone={
+                status === 'accepted' || status === 'completed'
+                  ? 'success'
+                  : status === 'declined' || status === 'cancelled' || status === 'expired'
+                    ? 'danger'
+                    : status === 'in_transit'
+                      ? 'warning'
+                      : 'brand'
+              }
+            >
+              {REFERRAL_STATUS_LABELS[status]}
+            </Chip>
+          ))}
+        </div>
+
+        <div
+          className={cn(
+            'grid gap-3 sm:grid-cols-2 lg:grid-cols-5',
+            moreOpen ? 'grid' : 'hidden lg:grid',
+          )}
+        >
+          <Field label="Urgency">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.urgency}
+                onChange={(event) => update({ urgency: event.target.value })}
+              >
+                <option value="all">Any urgency</option>
+                {URGENCY_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {URGENCY_LABELS[level]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          <Field label="Emergency type">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.type}
+                onChange={(event) => update({ type: event.target.value })}
+                disabled={emergencyTypes.isLoading}
+              >
+                <option value="all">Any emergency type</option>
+                {(emergencyTypes.data ?? []).map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          <Field label={hospitalId ? 'Other hospital' : 'Hospital'}>
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.hospital}
+                onChange={(event) => update({ hospital: event.target.value })}
+              >
+                <option value="">Any hospital</option>
+                {counterparts.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+
+          <Field label="Requested from">
+            {({ id }) => (
+              <Input
+                id={id}
+                type="date"
+                value={state.from}
+                max={state.to || undefined}
+                onChange={(event) => update({ from: event.target.value })}
+              />
+            )}
+          </Field>
+
+          <Field label="Requested to">
+            {({ id }) => (
+              <Input
+                id={id}
+                type="date"
+                value={state.to}
+                min={state.from || undefined}
+                onChange={(event) => update({ to: event.target.value })}
+              />
+            )}
+          </Field>
+        </div>
+      </FilterBar>
+
+      {referrals.isLoading ? (
+        <LoadingBlock label="Loading referrals" rows={4} />
+      ) : referrals.isError ? (
+        <ErrorBlock error={referrals.error} onRetry={() => void referrals.refetch()} />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={<Inbox className="h-6 w-6" aria-hidden />}
+          title={hasFilters ? 'No referrals match these filters' : 'No referrals yet'}
+          description={
+            hasFilters
+              ? 'Try widening the date range or clearing the status filter.'
+              : activeTab === 'incoming'
+                ? 'Referrals sent to your hospital will appear here the moment they are raised.'
+                : 'Referrals you raise will be tracked here from request to completion.'
+          }
+          action={
+            hasFilters ? (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : (
+              <Gate capability="referral:create">
+                <Link to="/referrals/new">
+                  <Button size="sm">New referral</Button>
+                </Link>
+              </Gate>
+            )
+          }
+        />
+      ) : (
+        <ul className="space-y-3 animate-fade-in">
+          {visible.map((referral) => (
+            <li key={referral.id}>
+              <ReferralCard
+                referral={referral}
+                direction={directionOf(referral)}
+                canRespond={can('referral:respond')}
+                busy={busyId === referral.id}
+                now={now}
+                onAccept={(target) => void respond(target, 'accepted')}
+                onDecline={(target) => {
+                  setDeclineReason('')
+                  setDeclining(target)
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Modal
         open={declining !== null}

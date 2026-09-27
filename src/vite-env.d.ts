@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_APP_NAME?: string
   readonly VITE_DEFAULT_TIMEZONE?: string
   readonly VITE_SUPPORT_EMAIL?: string
+  /** Canonical public origin, e.g. https://hospital-ref.vercel.app. */
+  readonly VITE_APP_URL?: string
 }
 
 interface ImportMeta {

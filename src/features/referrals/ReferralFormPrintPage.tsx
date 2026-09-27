@@ -144,9 +144,7 @@ export default function ReferralFormPrintPage() {
             </p>
             <p className="mt-1 text-sm">
               {referral.required_resources.length > 0
-                ? referral.required_resources
-                    .map((key) => RESOURCES[key]?.label ?? key)
-                    .join(', ')
+                ? referral.required_resources.map((key) => RESOURCES[key]?.label ?? key).join(', ')
                 : 'None specified'}
             </p>
           </div>
@@ -162,10 +160,7 @@ export default function ReferralFormPrintPage() {
                 value={formatPercent(snapshot.selected.resource_score, 0)}
               />
               <Row label="Proximity" value={formatPercent(snapshot.selected.proximity_score, 0)} />
-              <Row
-                label="Readiness at the time"
-                value={capitalise(snapshot.selected.readiness)}
-              />
+              <Row label="Readiness at the time" value={capitalise(snapshot.selected.readiness)} />
               <Row
                 label="Readiness penalty"
                 value={
@@ -242,26 +237,36 @@ function Letterhead({
 }) {
   return (
     <header className="print-block flex items-start justify-between gap-8 border-b-2 border-slate-900 pb-4">
-      <div className="min-w-0">
-        <h1 className="text-lg font-bold uppercase tracking-wide">
-          {hospital?.name ?? fallbackName}
-        </h1>
-        {hospital && (
-          <p className="mt-0.5 text-xs text-slate-600">
-            {HOSPITAL_LEVEL_LABELS[hospital.level]}
-            {hospital.code ? ` - ${hospital.code}` : ''}
-          </p>
+      <div className="flex min-w-0 items-start gap-4">
+        {hospital?.logo_url && (
+          <img
+            src={hospital.logo_url}
+            alt=""
+            className="h-16 w-16 shrink-0 object-contain"
+            crossOrigin="anonymous"
+          />
         )}
-        <address className="mt-2 space-y-0.5 text-xs not-italic text-slate-700">
-          {hospital?.address && <p>{hospital.address}</p>}
-          <p>
-            {[hospital?.city, hospital?.region, hospital?.country].filter(Boolean).join(', ') ||
-              'Address not recorded'}
-          </p>
-          {hospital?.phone && <p>Tel {hospital.phone}</p>}
-          {hospital?.emergency_phone && <p>Emergency {hospital.emergency_phone}</p>}
-          {hospital?.email && <p>{hospital.email}</p>}
-        </address>
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold uppercase tracking-wide">
+            {hospital?.name ?? fallbackName}
+          </h1>
+          {hospital && (
+            <p className="mt-0.5 text-xs text-slate-600">
+              {HOSPITAL_LEVEL_LABELS[hospital.level]}
+              {hospital.code ? ` - ${hospital.code}` : ''}
+            </p>
+          )}
+          <address className="mt-2 space-y-0.5 text-xs not-italic text-slate-700">
+            {hospital?.address && <p>{hospital.address}</p>}
+            <p>
+              {[hospital?.city, hospital?.region, hospital?.country].filter(Boolean).join(', ') ||
+                'Address not recorded'}
+            </p>
+            {hospital?.phone && <p>Tel {hospital.phone}</p>}
+            {hospital?.emergency_phone && <p>Emergency {hospital.emergency_phone}</p>}
+            {hospital?.email && <p>{hospital.email}</p>}
+          </address>
+        </div>
       </div>
 
       <div className="shrink-0 text-right">

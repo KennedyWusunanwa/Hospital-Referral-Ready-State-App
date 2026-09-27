@@ -37,7 +37,7 @@ function UpdateLink({
       className={cn(
         'inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
         emphasis
-          ? 'bg-brand-600 text-white hover:bg-brand-700'
+          ? 'bg-brand-600 text-brand-fg hover:bg-brand-700'
           : 'border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800',
       )}
     >
@@ -165,12 +165,7 @@ export interface ReadinessDutyProps {
   now: Date
 }
 
-export function ReadinessDuty({
-  hospitalId,
-  departmentId,
-  minutesLeft,
-  now,
-}: ReadinessDutyProps) {
+export function ReadinessDuty({ hospitalId, departmentId, minutesLeft, now }: ReadinessDutyProps) {
   const query = useDepartmentReadiness(hospitalId)
 
   const mine = useMemo(

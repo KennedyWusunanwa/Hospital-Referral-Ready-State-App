@@ -14,17 +14,20 @@ import { Gate } from '@/auth/RequireAuth'
 import {
   Badge,
   Button,
+  Chip,
   EmptyState,
   ErrorBlock,
-  Input,
   LoadingBlock,
+  SearchInput,
   Select,
   StatusDot,
 } from '@/components/ui'
 import {
   DEPARTMENT_TEMPLATES,
+  DEPARTMENT_TEMPLATE_KEYS,
   READINESS_LABELS,
   READINESS_STATUSES,
+  type DepartmentTemplateKey,
   type ReadinessStatus,
 } from '@/lib/constants'
 import type { DepartmentReadiness } from '@/lib/types'
@@ -33,10 +36,9 @@ import { READINESS_COLOR_CLASSES } from '@/domain/readiness'
 import { shiftLabel } from '@/domain/shifts'
 import { useDepartmentReadiness, useNowTick } from './useReadiness'
 
-/** Above this many departments a search box earns its place. */
-const FILTER_THRESHOLD = 6
-
 const SEVERITY_ORDER: Record<ReadinessStatus, number> = { red: 0, yellow: 1, green: 2 }
+
+const STATUS_TONE = { green: 'success', yellow: 'warning', red: 'danger' } as const
 
 function staleness(department: DepartmentReadiness): string {
   if (!department.last_submitted_at) return 'Never submitted'
@@ -53,7 +55,22 @@ function lastShiftLabel(department: DepartmentReadiness): string | null {
   })
 }
 
-function DepartmentRow({
+/** Worst first, then most overdue, then by name. Off-rota departments sink. */
+export function sortDepartments(rows: DepartmentReadiness[]): DepartmentReadiness[] {
+  return [...rows].sort((a, b) => {
+    if (a.requires_shift_update !== b.requires_shift_update) {
+      return a.requires_shift_update ? -1 : 1
+    }
+    const severity = SEVERITY_ORDER[a.status] - SEVERITY_ORDER[b.status]
+    if (severity !== 0) return severity
+    if (a.shifts_since_update !== b.shifts_since_update) {
+      return b.shifts_since_update - a.shifts_since_update
+    }
+    return a.department_name.localeCompare(b.department_name)
+  })
+}
+
+export function DepartmentRow({
   department,
   now,
   compact,
@@ -80,17 +97,7 @@ function DepartmentRow({
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
             {department.department_name}
           </p>
-          <Badge
-            tone={
-              department.status === 'green'
-                ? 'success'
-                : department.status === 'yellow'
-                  ? 'warning'
-                  : 'danger'
-            }
-          >
-            {READINESS_LABELS[department.status]}
-          </Badge>
+          <Badge tone={STATUS_TONE[department.status]}>{READINESS_LABELS[department.status]}</Badge>
           {!department.requires_shift_update && <Badge tone="neutral">Not on shift rota</Badge>}
         </div>
 
@@ -122,7 +129,7 @@ function DepartmentRow({
               'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
               department.status === 'green'
                 ? 'border border-slate-300 text-slate-700 hover:bg-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
-                : 'bg-brand-600 text-white hover:bg-brand-700',
+                : 'bg-brand-600 text-brand-fg hover:bg-brand-700',
             )}
           >
             <PencilLine className="h-4 w-4" aria-hidden />
@@ -146,30 +153,41 @@ export function ReadinessBoard({ hospitalId, compact = false, className }: Readi
   const query = useDepartmentReadiness(hospitalId)
   const now = useNowTick()
   const [status, setStatus] = useState<ReadinessStatus | 'all'>('all')
+  const [template, setTemplate] = useState<DepartmentTemplateKey | 'all'>('all')
   const [search, setSearch] = useState('')
 
   const departments = useMemo(() => query.data ?? [], [query.data])
 
+  const counts = useMemo(() => {
+    const tally: Record<ReadinessStatus, number> = { green: 0, yellow: 0, red: 0 }
+    for (const department of departments) {
+      if (department.requires_shift_update) tally[department.status] += 1
+    }
+    return tally
+  }, [departments])
+
+  const templatesInUse = useMemo(
+    () => DEPARTMENT_TEMPLATE_KEYS.filter((key) => departments.some((d) => d.template_key === key)),
+    [departments],
+  )
+
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
-    return departments
-      .filter((department) => status === 'all' || department.status === status)
-      .filter(
-        (department) => term === '' || department.department_name.toLowerCase().includes(term),
-      )
-      .sort((a, b) => {
-        // Departments off the rota can never be actioned, so they sink.
-        if (a.requires_shift_update !== b.requires_shift_update) {
-          return a.requires_shift_update ? -1 : 1
-        }
-        const severity = SEVERITY_ORDER[a.status] - SEVERITY_ORDER[b.status]
-        if (severity !== 0) return severity
-        if (a.shifts_since_update !== b.shifts_since_update) {
-          return b.shifts_since_update - a.shifts_since_update
-        }
-        return a.department_name.localeCompare(b.department_name)
-      })
-  }, [departments, search, status])
+    return sortDepartments(
+      departments
+        .filter((department) => status === 'all' || department.status === status)
+        .filter((department) => template === 'all' || department.template_key === template)
+        .filter(
+          (department) =>
+            term === '' ||
+            department.department_name.toLowerCase().includes(term) ||
+            (department.last_submitted_by_name ?? '').toLowerCase().includes(term) ||
+            (DEPARTMENT_TEMPLATES[department.template_key]?.label ?? '')
+              .toLowerCase()
+              .includes(term),
+        ),
+    )
+  }, [departments, search, status, template])
 
   if (!hospitalId) {
     return (
@@ -196,39 +214,66 @@ export function ReadinessBoard({ hospitalId, compact = false, className }: Readi
     )
   }
 
-  const showFilters = !compact && departments.length > FILTER_THRESHOLD
+  const filtersActive = status !== 'all' || template !== 'all' || search !== ''
+  const clearFilters = () => {
+    setSearch('')
+    setStatus('all')
+    setTemplate('all')
+  }
 
   return (
     <div className={cn('space-y-3', className)}>
-      {showFilters && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-              aria-hidden
-            />
-            <Input
-              type="search"
-              className="pl-9"
-              placeholder="Search departments"
+      {!compact && (
+        <div className="space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <SearchInput
+              containerClassName="flex-1"
+              placeholder="Search departments or who last reported"
               aria-label="Search departments"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={setSearch}
             />
+            {templatesInUse.length > 1 && (
+              <Select
+                className="sm:w-56"
+                aria-label="Filter by department type"
+                value={template}
+                onChange={(event) =>
+                  setTemplate(event.target.value as DepartmentTemplateKey | 'all')
+                }
+              >
+                <option value="all">All department types</option>
+                {templatesInUse.map((key) => (
+                  <option key={key} value={key}>
+                    {DEPARTMENT_TEMPLATES[key].label}
+                  </option>
+                ))}
+              </Select>
+            )}
           </div>
-          <Select
-            className="sm:w-52"
-            aria-label="Filter by readiness status"
-            value={status}
-            onChange={(event) => setStatus(event.target.value as ReadinessStatus | 'all')}
-          >
-            <option value="all">All statuses</option>
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip active={status === 'all'} onClick={() => setStatus('all')} tone="neutral">
+              All
+              <span className="tabular-nums opacity-70">{departments.length}</span>
+            </Chip>
             {READINESS_STATUSES.map((value) => (
-              <option key={value} value={value}>
+              <Chip
+                key={value}
+                active={status === value}
+                onClick={() => setStatus(status === value ? 'all' : value)}
+                tone={STATUS_TONE[value]}
+                count={counts[value]}
+              >
+                <StatusDot status={value} />
                 {READINESS_LABELS[value]}
-              </option>
+              </Chip>
             ))}
-          </Select>
+            {filtersActive && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto">
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -238,14 +283,7 @@ export function ReadinessBoard({ hospitalId, compact = false, className }: Readi
           title="No departments match"
           description="Clear the search or choose a different status."
           action={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSearch('')
-                setStatus('all')
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={clearFilters}>
               Clear filters
             </Button>
           }

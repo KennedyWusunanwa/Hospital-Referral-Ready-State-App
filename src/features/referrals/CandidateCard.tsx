@@ -58,7 +58,7 @@ export function CandidateCard({
         className={cn(
           'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
           selected
-            ? 'bg-brand-600 text-white'
+            ? 'bg-brand-600 text-brand-fg'
             : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
         )}
         aria-hidden

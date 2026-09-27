@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { ImageIcon, Palette, RotateCcw, Trash2, Upload } from 'lucide-react'
+import { ImageIcon, Moon, Palette, RotateCcw, Sun, Trash2, Upload } from 'lucide-react'
 import {
   Alert,
   Button,
@@ -12,6 +12,7 @@ import {
   Field,
   Input,
   LoadingBlock,
+  SegmentedControl,
 } from '@/components/ui'
 import {
   DEFAULT_BRAND_COLOR,
@@ -21,8 +22,9 @@ import {
   rgbToHex,
   whiteContrast,
 } from '@/lib/branding'
-import { rowToBranding, useAppSettings } from '@/features/branding/useBranding'
-import { formatDateTime } from '@/lib/utils'
+import { BUILT_IN_LOGOS, LOGO_MODES, LOGO_MODE_LABELS, type LogoMode } from '@/lib/constants'
+import { resolveLogo, rowToBranding, useAppSettings } from '@/features/branding/useBranding'
+import { cn, formatDateTime } from '@/lib/utils'
 import {
   ACCEPTED_LOGO_TYPES,
   MAX_LOGO_BYTES,
@@ -72,17 +74,139 @@ function RampPreview({ color }: { color: string }) {
   )
 }
 
+/** One upload slot, previewed on the surface it is for. */
+function LogoSlot({
+  variant,
+  value,
+  onChange,
+  appName,
+}: {
+  variant: 'light' | 'dark'
+  value: string | null
+  onChange: (next: string | null) => void
+  appName: string
+}) {
+  const upload = useUploadLogo()
+  const fileInput = useRef<HTMLInputElement>(null)
+  const builtIn = variant === 'dark' ? BUILT_IN_LOGOS.dark : BUILT_IN_LOGOS.light
+  const Icon = variant === 'dark' ? Moon : Sun
+
+  const onPickFile = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      const result = await upload.mutateAsync({ file, variant })
+      onChange(result.publicUrl)
+      toast.success('Logo uploaded. Save to apply it.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Upload failed')
+    } finally {
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-slate-400" aria-hidden />
+        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+          {variant === 'dark' ? 'Dark surfaces' : 'Light surfaces'}
+        </p>
+        {!value && <span className="hint">Using the built-in FERN artwork</span>}
+      </div>
+      <div
+        className={cn(
+          'flex h-28 items-center justify-center rounded-xl border p-4',
+          variant === 'dark' ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white',
+        )}
+      >
+        <img
+          src={value ?? builtIn}
+          alt={`${appName} logo for ${variant} surfaces`}
+          className="max-h-full max-w-full object-contain"
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <input
+          ref={fileInput}
+          type="file"
+          accept={ACCEPTED_LOGO_TYPES.join(',')}
+          className="sr-only"
+          onChange={(event) => void onPickFile(event.target.files?.[0])}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fileInput.current?.click()}
+          loading={upload.isPending}
+        >
+          <Upload className="h-4 w-4" aria-hidden />
+          {value ? 'Replace' : 'Upload'}
+        </Button>
+        {value && (
+          <Button variant="ghost" size="sm" onClick={() => onChange(null)}>
+            <Trash2 className="h-4 w-4" aria-hidden />
+            Use built-in
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** A miniature of the sidebar header in both themes, using the draft settings. */
+function LivePreview({
+  logoUrl,
+  logoDarkUrl,
+  logoMode,
+  appTagline,
+}: {
+  logoUrl: string | null
+  logoDarkUrl: string | null
+  logoMode: LogoMode
+  appTagline: string
+}) {
+  const draft = { logoUrl, logoDarkUrl, logoMode }
+  const light = resolveLogo(draft, 'light')
+  const dark = resolveLogo(draft, 'dark')
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Light theme
+        </p>
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <img src={light.src} alt="" className="h-8 w-auto object-contain object-left" />
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            {appTagline}
+          </p>
+        </div>
+      </div>
+      <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Dark theme
+        </p>
+        <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+          <img src={dark.src} alt="" className="h-8 w-auto object-contain object-left" />
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            {appTagline}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AppearanceSettings() {
   const settings = useAppSettings()
   const update = useUpdateAppSettings()
-  const uploadLogo = useUploadLogo()
-  const fileInput = useRef<HTMLInputElement>(null)
 
   const saved = rowToBranding(settings.data ?? null)
   const savedColorRef = useRef(saved.brandColor)
 
   const [color, setColor] = useState(saved.brandColor)
   const [logoUrl, setLogoUrl] = useState<string | null>(saved.logoUrl)
+  const [logoDarkUrl, setLogoDarkUrl] = useState<string | null>(saved.logoDarkUrl)
+  const [logoMode, setLogoMode] = useState<LogoMode>(saved.logoMode)
   const [appName, setAppName] = useState(saved.appName)
   const [appTagline, setAppTagline] = useState(saved.appTagline)
   const [supportEmail, setSupportEmail] = useState(saved.supportEmail)
@@ -94,6 +218,8 @@ export default function AppearanceSettings() {
     savedColorRef.current = next.brandColor
     setColor(next.brandColor)
     setLogoUrl(next.logoUrl)
+    setLogoDarkUrl(next.logoDarkUrl)
+    setLogoMode(next.logoMode)
     setAppName(next.appName)
     setAppTagline(next.appTagline)
     setSupportEmail(next.supportEmail)
@@ -130,22 +256,11 @@ export default function AppearanceSettings() {
   const dirty =
     color !== saved.brandColor ||
     logoUrl !== saved.logoUrl ||
+    logoDarkUrl !== saved.logoDarkUrl ||
+    logoMode !== saved.logoMode ||
     appName !== saved.appName ||
     appTagline !== saved.appTagline ||
     supportEmail !== saved.supportEmail
-
-  const onPickFile = async (file: File | undefined) => {
-    if (!file) return
-    try {
-      const result = await uploadLogo.mutateAsync(file)
-      setLogoUrl(result.publicUrl)
-      toast.success('Logo uploaded. Save to apply it.')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Upload failed')
-    } finally {
-      if (fileInput.current) fileInput.current.value = ''
-    }
-  }
 
   const onSave = async () => {
     if (!validColor) {
@@ -156,6 +271,8 @@ export default function AppearanceSettings() {
       await update.mutateAsync({
         brand_color: color,
         logo_url: logoUrl,
+        logo_dark_url: logoDarkUrl,
+        logo_mode: logoMode,
         app_name: appName.trim(),
         app_tagline: appTagline.trim(),
         support_email: supportEmail.trim() || null,
@@ -170,14 +287,18 @@ export default function AppearanceSettings() {
   const onResetDefaults = () => {
     setColor(DEFAULT_BRAND_COLOR)
     setLogoUrl(null)
+    setLogoDarkUrl(null)
+    setLogoMode('auto')
   }
 
   return (
     <div className="space-y-5">
       {settingsMissing && (
         <Alert tone="warning" title="Branding table not found">
-          This deployment has not run <code className="font-mono text-xs">0005_settings_and_invites.sql</code>{' '}
-          yet, so changes cannot be saved. Run it in the Supabase SQL editor, then reload.
+          This deployment has not run{' '}
+          <code className="font-mono text-xs">0005_settings_and_invites.sql</code> and{' '}
+          <code className="font-mono text-xs">0006_platform_console.sql</code> yet, so changes
+          cannot be saved. Run them in the Supabase SQL editor, then reload.
         </Alert>
       )}
 
@@ -280,49 +401,50 @@ export default function AppearanceSettings() {
 
       <Card>
         <CardHeader
-          title="Logo"
-          description="Shown in the sidebar and on the sign-in screen. PNG, SVG, JPEG or WebP, under 1 MB."
+          title="Logos"
+          description="One for light surfaces, one for dark. The app switches between them with the viewer's theme; the sign-in panel always uses the dark-surface logo."
           action={<ImageIcon className="h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden />}
         />
-        <CardBody className="space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-              {logoUrl ? (
-                <img src={logoUrl} alt="Current logo" className="h-full w-full object-contain" />
-              ) : (
-                <span className="grid h-10 w-10 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-brand-fg">
-                  {appName.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={fileInput}
-                type="file"
-                accept={ACCEPTED_LOGO_TYPES.join(',')}
-                className="sr-only"
-                onChange={(event) => void onPickFile(event.target.files?.[0])}
-              />
-              <Button
-                variant="outline"
-                onClick={() => fileInput.current?.click()}
-                loading={uploadLogo.isPending}
-              >
-                <Upload className="h-4 w-4" aria-hidden />
-                {logoUrl ? 'Replace' : 'Upload'}
-              </Button>
-              {logoUrl && (
-                <Button variant="ghost" onClick={() => setLogoUrl(null)}>
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                  Remove
-                </Button>
-              )}
-            </div>
+        <CardBody className="space-y-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <LogoSlot variant="light" value={logoUrl} onChange={setLogoUrl} appName={appName} />
+            <LogoSlot
+              variant="dark"
+              value={logoDarkUrl}
+              onChange={setLogoDarkUrl}
+              appName={appName}
+            />
           </div>
+
+          <div>
+            <p className="field-label mb-1.5">Switching</p>
+            <SegmentedControl
+              ariaLabel="Logo switching"
+              value={logoMode}
+              onChange={setLogoMode}
+              options={LOGO_MODES.map((mode) => ({ value: mode, label: LOGO_MODE_LABELS[mode] }))}
+            />
+            <p className="mt-1.5 hint">
+              {logoMode === 'auto'
+                ? 'Light surfaces get the light-surface logo, dark surfaces the dark one. If only one is uploaded it is used everywhere.'
+                : `Every surface uses the ${logoMode}-surface logo, whatever the viewer's theme.`}
+            </p>
+          </div>
+
+          <div>
+            <p className="field-label mb-1.5">Preview</p>
+            <LivePreview
+              logoUrl={logoUrl}
+              logoDarkUrl={logoDarkUrl}
+              logoMode={logoMode}
+              appTagline={appTagline}
+            />
+          </div>
+
           <p className="hint">
-            With no logo the app falls back to the first two letters of the name on a brand-coloured
-            tile. Maximum {(MAX_LOGO_BYTES / 1024 / 1024).toFixed(0)} MB.
+            PNG, SVG, JPEG or WebP, under {(MAX_LOGO_BYTES / 1024 / 1024).toFixed(0)} MB each. A
+            wide wordmark works best; it is shown about 32 pixels tall in the sidebar and 56 on the
+            sign-in screen.
           </p>
         </CardBody>
       </Card>
@@ -330,7 +452,10 @@ export default function AppearanceSettings() {
       <Card>
         <CardHeader title="Naming" description="How the app refers to itself throughout." />
         <CardBody className="grid gap-4 sm:grid-cols-2">
-          <Field label="Application name" hint="Shown in the sidebar and browser tab.">
+          <Field
+            label="Application name"
+            hint="Used in the browser tab, install prompts and emails."
+          >
             {({ id }) => (
               <Input
                 id={id}
@@ -340,7 +465,7 @@ export default function AppearanceSettings() {
               />
             )}
           </Field>
-          <Field label="Tagline" hint="The line under the name in the sidebar.">
+          <Field label="Tagline" hint="The line under the logo in the sidebar.">
             {({ id }) => (
               <Input
                 id={id}
@@ -371,7 +496,11 @@ export default function AppearanceSettings() {
               ? `Last changed ${formatDateTime(settings.data.updated_at)}`
               : 'Not changed yet'}
           </p>
-          <Button onClick={() => void onSave()} loading={update.isPending} disabled={!dirty || settingsMissing}>
+          <Button
+            onClick={() => void onSave()}
+            loading={update.isPending}
+            disabled={!dirty || settingsMissing}
+          >
             Save appearance
           </Button>
         </CardFooter>

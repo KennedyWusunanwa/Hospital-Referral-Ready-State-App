@@ -43,10 +43,10 @@ import type {
 const REFERRAL_SELECT: string = `
   *,
   requesting_hospital:hospitals!referrals_requesting_hospital_id_fkey (
-    id, name, code, phone, emergency_phone, city, region
+    id, name, code, phone, emergency_phone, city, region, logo_url
   ),
   receiving_hospital:hospitals!referrals_receiving_hospital_id_fkey (
-    id, name, code, phone, emergency_phone, city, region
+    id, name, code, phone, emergency_phone, city, region, logo_url
   ),
   emergency_type:emergency_types!referrals_emergency_type_id_fkey (
     id, name, code, category
@@ -238,7 +238,9 @@ export function useReferrals(filters: ReferralFilters): UseQueryResult<ReferralW
   })
 }
 
-export function useReferral(referralId: string | null): UseQueryResult<ReferralWithRelations | null> {
+export function useReferral(
+  referralId: string | null,
+): UseQueryResult<ReferralWithRelations | null> {
   return useQuery({
     queryKey: queryKeys.referrals.detail(referralId ?? 'none'),
     enabled: Boolean(referralId),
@@ -450,4 +452,61 @@ export function referralScore(referral: Pick<Referral, 'score_snapshot'>): numbe
   const selected = asJsonObject(asJsonObject(referral.score_snapshot)?.selected)
   const score = selected?.score
   return typeof score === 'number' && Number.isFinite(score) ? score : null
+}
+
+// ---------------------------------------------------------------------------
+// Global search
+// ---------------------------------------------------------------------------
+
+export interface ReferralSearchHit {
+  id: string
+  reference_number: string
+  status: ReferralStatus
+  urgency: UrgencyLevel
+  patient_ref: string
+  requested_at: string
+  requesting_hospital: { name: string } | null
+  receiving_hospital: { name: string } | null
+}
+
+/**
+ * PostgREST parses `or=(...)` as a comma-delimited list, so a search term
+ * containing a comma, bracket or wildcard would change the meaning of the
+ * filter rather than be matched literally.
+ */
+function sanitiseSearchTerm(term: string): string {
+  return term
+    .replace(/[,()%*"']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const REFERRAL_SEARCH_SELECT: string = `
+  id, reference_number, status, urgency, patient_ref, requested_at,
+  requesting_hospital:hospitals!referrals_requesting_hospital_id_fkey ( name ),
+  receiving_hospital:hospitals!referrals_receiving_hospital_id_fkey ( name )
+`
+
+/** The command palette's referral lookup: reference, patient code or summary text. */
+export function useReferralSearch(term: string, limit = 8): UseQueryResult<ReferralSearchHit[]> {
+  const needle = sanitiseSearchTerm(term)
+  return useQuery({
+    queryKey: [...queryKeys.referrals.all, 'search', needle, limit],
+    enabled: needle.length >= 2,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('referrals')
+        .select(REFERRAL_SEARCH_SELECT)
+        .or(
+          `reference_number.ilike.%${needle}%,patient_ref.ilike.%${needle}%,clinical_summary.ilike.%${needle}%`,
+        )
+        .order('requested_at', { ascending: false })
+        .limit(limit)
+        .returns<ReferralSearchHit[]>()
+      if (error) fail(error)
+      return data ?? []
+    },
+  })
 }

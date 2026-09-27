@@ -380,18 +380,65 @@ const { data: role } = await supabase.rpc('current_user_role')
 
 | | |
 | --- | --- |
-| **Purpose** | Stamp `profiles.last_login_at` and write an `auth.login` audit row |
+| **Purpose** | Stamp `profiles.last_login_at`, write a `login_events` row and an `auth.login` audit row |
 | **May call** | Any authenticated user, for themselves |
 
-**Arguments** — none. **Returns** — `void`.
+**Arguments**
 
-Called by `AuthProvider` immediately after a successful password sign-in, and deliberately
-**best-effort**: the promise is swallowed on failure, because a failed audit write must never stop a
-clinician signing in at 3am.
+| Name | Type | Notes |
+| --- | --- | --- |
+| `p_method` | `text` | `password`, `otp` or `recovery`; anything else is stored as `unknown` |
+| `p_user_agent` | `text` | The browser's user-agent string, truncated to 512 characters |
+
+**Returns** — `void`.
+
+The client address is **not** an argument: the function reads `x-forwarded-for` (or
+`cf-connecting-ip` / `x-real-ip`) from the request headers PostgREST exposes, so it cannot be
+forged by the caller. Called by `AuthProvider` after a password sign-in, after an email-code
+sign-in, and when a recovery link lands. Deliberately **best-effort**: the promise is swallowed on
+failure, because a failed audit write must never stop a clinician signing in at 3am.
 
 ```ts
-await supabase.rpc('record_login').then(undefined, () => undefined)
+await supabase
+  .rpc('record_login', { p_method: 'otp', p_user_agent: navigator.userAgent })
+  .then(undefined, () => undefined)
 ```
+
+---
+
+### `record_logout`
+
+| | |
+| --- | --- |
+| **Purpose** | Write an `auth.logout` audit row for the caller |
+| **May call** | Any authenticated user, for themselves |
+
+**Arguments** — none. **Returns** — `void`. The client races it against a short timeout so a slow
+network never delays the sign-out itself.
+
+---
+
+### `platform_stats`
+
+| | |
+| --- | --- |
+| **Purpose** | The numbers on the system console overview, in one round trip |
+| **May call** | `super_admin` only; anyone else gets `42501` |
+
+**Arguments** — none. **Returns** `jsonb` with these keys:
+
+| Key | Contents |
+| --- | --- |
+| `hospitals` | `total`, `active`, `accepting`, `on_diversion`, `with_logo`, `by_region[]`, `by_level{}`, `readiness{green,yellow,red,unconfigured}` (hospital roll-ups, evaluated in each hospital's timezone) |
+| `departments` | `total`, `reporting`, `green`, `yellow`, `red`, `updates_24h` |
+| `users` | `total`, `active`, `deactivated`, `unattached`, `never_signed_in`, `by_role{}`, `signed_in_24h`, `signed_in_7d`, `signed_in_30d`, `pending_invites` |
+| `referrals` | `last_24h`, `last_7d`, `last_30d`, `all_time`, `pending`, `pending_overdue`, `in_transit`, `accepted_7d`, `declined_7d`, `completed_7d`, `avg_response_seconds_7d` |
+| `activity` | `audit_events_24h`, `messages_24h`, `notifications_24h`, `unread_notifications`, `logins_24h`, `failed_logins_24h` |
+| `logins_daily` | fourteen `{day, logins, unique_users}` rows, zero-filled |
+| `referrals_daily` | fourteen `{day, created, completed}` rows, zero-filled |
+
+`src/features/console/platformStats.ts` normalises the payload; every field has a default, so an
+older database that lacks a key still renders.
 
 ---
 

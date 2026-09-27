@@ -6,7 +6,7 @@ import { useTheme } from '@/lib/theme'
  * -- it cannot read our class-based dark mode off the document.
  */
 export function AppToaster() {
-  const [theme] = useTheme()
+  const { theme } = useTheme()
 
   return (
     <Toaster

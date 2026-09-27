@@ -35,8 +35,25 @@ number. See [docs/SECURITY.md](docs/SECURITY.md).
 | Communication | Per-referral real-time chat between the two hospitals (Supabase Realtime), open only while the case is live |
 | Alerts | In-app notification centre with unread badge; automatic overdue-readiness alerts to hospital administrators |
 | Reports | Referral volume and outcomes, acceptance rate, average and median response time, per-hospital performance, per-department readiness compliance; CSV export |
-| Administration | Hospitals, departments, staff and roles, scoring configuration, audit log viewer |
-| Security | Supabase Auth with PKCE, five roles, a capability matrix in the UI and Postgres row-level security as the real boundary, append-only audit trail |
+| Administration | Hospital administrators manage their own facility: details and logo, departments, staff and invitations, audit log |
+| System console | Network-wide administration for system administrators: platform statistics with 14-day trends, every hospital (create, edit, logos, departments, diversion and active flags), every account across the three access levels, the sign-in log, the emergency catalogue and its weighted requirements, scoring, branding and the full audit trail |
+| Search everywhere | Ctrl+K / ⌘K command palette over hospitals, referrals, departments, people and pages; URL-synced filters, sorting and search on every list so a view can be bookmarked or shared |
+| Identity | Three access levels (System, Hospital, Department) over five roles; per-facility logos with deterministic monogram fallbacks; light and dark network logos that follow the viewer's theme; System / Light / Dark theme preference |
+| Security | Supabase Auth with PKCE, five roles in three access levels, a capability matrix in the UI and Postgres row-level security as the real boundary, append-only audit trail, per-sign-in log with method, device and address |
+
+### Access levels
+
+People are managed at three levels, which group the five database roles:
+
+| Level | Roles | Scope |
+| --- | --- | --- |
+| **System** | System Administrator | The whole platform: hospitals, accounts, catalogue, scoring, branding, audit, sign-ins. Developers and the programme office. |
+| **Hospital** | Hospital Administrator, Referral Coordinator, Viewer | One facility: its settings, staff, referrals and reports. |
+| **Department** | Shift In-Charge | One department in one facility: files the readiness update every shift. |
+
+The levels change nothing in row-level security; they are how invitations, filters and labels are
+organised. The current public origin is **https://hospital-ref.vercel.app** until the national
+domain is in place.
 
 Explicitly **not** in this release: push/SMS notifications, biometric login, offline mode and
 HIS/EMR integration. See [SPECIFICATION.md](docs/SPECIFICATION.md) section 8.
@@ -108,6 +125,7 @@ and rollback — are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 | `VITE_APP_NAME` | no | Product name shown in the UI (default `FERN`) |
 | `VITE_DEFAULT_TIMEZONE` | no | IANA zone used when a hospital has none (default `Africa/Accra`) |
 | `VITE_SUPPORT_EMAIL` | no | Address shown on error and access-denied screens |
+| `VITE_APP_URL` | no | Canonical public origin (default `https://hospital-ref.vercel.app`, the temporary host until the national domain is bought) |
 
 `VITE_*` variables are inlined into the bundle **at build time**. Changing one in Vercel requires a
 redeploy, not just a restart. The service-role key must never be added here.
@@ -143,7 +161,8 @@ redeploy, not just a restart. The service-role key must never be added here.
     ├── index.css             Tailwind layers and design tokens
     ├── auth/                 AuthProvider (session + profile), RequireAuth / RequireCapability
     ├── components/
-    │   ├── layout/           AppLayout shell, ErrorBoundary
+    │   ├── brand/            BrandLogo -- the network logo resolved for the current theme
+    │   ├── layout/           AppLayout shell, command palette wiring, ErrorBoundary
     │   └── ui/               The whole design system in one module
     ├── domain/               Pure, dependency-free logic — the parts worth unit-testing
     │   ├── geo.ts            Haversine distance, road factor, ETA, proximity sub-score
@@ -151,16 +170,20 @@ redeploy, not just a restart. The service-role key must never be added here.
     │   ├── readiness.ts      Green / yellow / red derivation and hospital roll-up
     │   └── scoring.ts        The ranking engine and its audit snapshots
     ├── features/
-    │   ├── admin/            Hospitals, departments, staff, scoring config, audit log
+    │   ├── admin/            Hospital settings and form, departments, staff and invitations, scoring, appearance, audit log
     │   ├── auth/             Login and password reset screens
+    │   ├── branding/         Network branding read side (colour, light/dark logos)
+    │   ├── console/          System console: overview and stats, hospitals, users, sign-ins, emergency catalogue
     │   ├── dashboard/        Landing dashboard
     │   ├── hospitals/        Directory, detail, resource and blood-stock panels
     │   ├── messaging/        Per-referral chat thread and its realtime subscription
     │   ├── notifications/    Notification centre and unread badge
     │   ├── readiness/        Readiness board and the shift submission form
     │   ├── referrals/        New referral wizard, candidate ranking, detail, print form
-    │   └── reports/          Analytics, performance and compliance reporting
-    └── lib/                  constants, database.types, types, supabase client, queryKeys, utils
+    │   ├── reports/          Analytics, performance and compliance reporting
+    │   └── search/           Command palette and the global search behind it
+    └── lib/                  constants, database.types, types, supabase client, queryKeys, utils,
+                              theme (system/light/dark), branding, url-synced filter state, monograms
 ```
 
 Each feature folder owns a `use<Feature>.ts` module holding every TanStack Query hook for that

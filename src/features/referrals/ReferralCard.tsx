@@ -6,6 +6,7 @@ import { scoreBand } from '@/domain/scoring'
 import { REFERRAL_RESPONSE_TARGET_MINUTES } from '@/lib/constants'
 import type { ReferralWithRelations } from '@/lib/types'
 import { cn, formatDateTime, isReferralOverdue, relativeTime } from '@/lib/utils'
+import { HospitalLogo } from '@/features/hospitals/HospitalLogo'
 import { referralScore } from './useReferrals'
 import { ReferralStatusBadge, UrgencyBadge } from './ReferralStatusBadge'
 
@@ -77,6 +78,7 @@ export function ReferralCard({
           <p className="flex items-center gap-1.5 text-sm text-slate-900 dark:text-slate-100">
             <DirectionIcon className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
             <span className="sr-only">{directionLabel} </span>
+            {counterpart && <HospitalLogo hospital={counterpart} size="xs" />}
             <span className="truncate font-medium">{counterpartName}</span>
             {counterpart?.city && (
               <span className="hidden shrink-0 items-center gap-1 text-xs text-slate-500 sm:inline-flex dark:text-slate-400">
@@ -93,13 +95,14 @@ export function ReferralCard({
           </p>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-            <span className="inline-flex items-center gap-1" title={formatDateTime(referral.requested_at)}>
+            <span
+              className="inline-flex items-center gap-1"
+              title={formatDateTime(referral.requested_at)}
+            >
               <Clock className="h-3 w-3" aria-hidden />
               {relativeTime(referral.requested_at, now)}
             </span>
-            {referral.distance_km !== null && (
-              <span>{formatDistance(referral.distance_km)}</span>
-            )}
+            {referral.distance_km !== null && <span>{formatDistance(referral.distance_km)}</span>}
             {referral.eta_minutes !== null && (
               <span className="inline-flex items-center gap-1">
                 <Timer className="h-3 w-3" aria-hidden />
@@ -145,8 +148,7 @@ export function ReferralCard({
           className="mt-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
         >
           <Timer className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Awaiting response - {waitingMinutes} min (target{' '}
-          {REFERRAL_RESPONSE_TARGET_MINUTES} min)
+          Awaiting response - {waitingMinutes} min (target {REFERRAL_RESPONSE_TARGET_MINUTES} min)
         </p>
       )}
     </Card>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Activity,
   BarChart3,
@@ -8,19 +8,25 @@ import {
   Hospital as HospitalIcon,
   Inbox,
   LogOut,
-  Menu,
+  Menu as MenuIcon,
+  Monitor,
   MoreHorizontal,
   Moon,
+  Search,
   Settings,
+  ShieldCheck,
   Sun,
   X,
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
-import { Badge, Button, StatusDot } from '@/components/ui'
-import { ROLE_LABELS, type Capability } from '@/lib/constants'
+import { BrandLogo } from '@/components/brand/BrandLogo'
+import { Avatar, Badge, IconButton, Kbd, SegmentedControl, StatusDot } from '@/components/ui'
+import { ROLE_LABELS, ROLE_TIER_LABELS, ROLE_TIER_OF, type Capability } from '@/lib/constants'
 import { useBranding } from '@/features/branding/useBranding'
-import { useTheme } from '@/lib/theme'
-import { cn, initials } from '@/lib/utils'
+import { HospitalLogo } from '@/features/hospitals/HospitalLogo'
+import { CommandPalette, isApplePlatform } from '@/features/search/CommandPalette'
+import { useTheme, type ThemePreference } from '@/lib/theme'
+import { cn } from '@/lib/utils'
 import {
   useNotificationRealtime,
   useUnreadNotificationCount,
@@ -35,6 +41,8 @@ interface NavItem {
   shortLabel?: string
   icon: typeof Activity
   capability?: Capability
+  /** Hidden for accounts with no home facility (a system administrator, typically). */
+  requiresHospital?: boolean
   end?: boolean
 }
 
@@ -50,11 +58,29 @@ const NAV_ITEMS: NavItem[] = [
     shortLabel: 'Admin',
     icon: Settings,
     capability: 'admin:hospital',
+    requiresHospital: true,
+  },
+  {
+    to: '/console',
+    label: 'System console',
+    shortLabel: 'Console',
+    icon: ShieldCheck,
+    capability: 'admin:system',
   },
 ]
 
 /** How many destinations fit in the phone tab bar before the "More" tab. */
 const BOTTOM_NAV_SLOTS = 4
+
+const THEME_OPTIONS: ReadonlyArray<{
+  value: ThemePreference
+  label: string
+  icon: typeof Sun
+}> = [
+  { value: 'system', label: 'Follow the device', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+]
 
 // ---------------------------------------------------------------------------
 // Behaviour hooks
@@ -121,43 +147,62 @@ function useFocusTrap(ref: RefObject<HTMLElement>, active: boolean, onClose: () 
   }, [ref, active, onClose])
 }
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return (
+    tag === 'INPUT' ||
+    tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    target.isContentEditable ||
+    target.closest('[role="dialog"]') !== null
+  )
+}
+
+/** Ctrl/⌘+K anywhere, or "/" when no field has focus, opens the palette. */
+function useSearchShortcut(open: () => void): void {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        open()
+        return
+      }
+      if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (isTypingTarget(event.target)) return
+        event.preventDefault()
+        open()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open])
+}
+
 // ---------------------------------------------------------------------------
 // Sidebar pieces
 // ---------------------------------------------------------------------------
 
 /**
- * Logo and wordmark, from app_settings. Shared by the desktop sidebar and the
- * mobile drawer so the two cannot drift apart.
+ * Logo and tagline. Shared by the desktop sidebar and the mobile drawer so the
+ * two cannot drift apart. The wordmark carries the name, so only the tagline
+ * is printed as text.
  */
 function BrandIdentity() {
-  const { appName, appTagline, logoUrl } = useBranding()
+  const { appTagline } = useBranding()
   return (
-    <>
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt=""
-          className="h-9 w-9 shrink-0 rounded-lg object-contain"
-          aria-hidden
-        />
-      ) : (
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-brand-fg">
-          {appName.slice(0, 2).toUpperCase()}
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-          {appName}
-        </p>
-        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{appTagline}</p>
-      </div>
-    </>
+    <Link to="/" className="flex min-w-0 flex-col gap-1 rounded-lg" aria-label="Dashboard">
+      <BrandLogo className="h-8 w-auto max-w-[9.5rem]" />
+      <span className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {appTagline}
+      </span>
+    </Link>
   )
 }
 
 function Brand() {
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-slate-200 px-4 dark:border-slate-800">
+    <div className="flex h-[4.25rem] shrink-0 items-center border-b border-slate-200 px-4 dark:border-slate-800">
       <BrandIdentity />
     </div>
   )
@@ -210,46 +255,54 @@ function NavList({ items, pendingCount }: { items: NavItem[]; pendingCount?: num
   )
 }
 
+function ThemeSwitch() {
+  const { preference, setPreference } = useTheme()
+  return (
+    <SegmentedControl
+      size="sm"
+      ariaLabel="Theme"
+      value={preference}
+      onChange={setPreference}
+      className="w-full justify-between [&>button]:flex-1 [&>button]:justify-center"
+      options={THEME_OPTIONS.map(({ value, label, icon: Icon }) => ({
+        value,
+        label: (
+          <>
+            <Icon className="h-4 w-4" aria-hidden />
+            <span className="sr-only">{label}</span>
+          </>
+        ),
+      }))}
+    />
+  )
+}
+
 function SidebarFooter() {
   const { profile, role, signOut } = useAuth()
-  const [theme, setTheme] = useTheme()
-  const dark = theme === 'dark'
+  const tier = role ? ROLE_TIER_LABELS[ROLE_TIER_OF[role]] : null
 
   return (
     <div className="shrink-0 border-t border-slate-200 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-slate-800">
       <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-          {initials(profile?.full_name)}
-        </div>
+        <Avatar name={profile?.full_name} size="sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
             {profile?.full_name ?? 'Signed in'}
           </p>
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-            {role ? ROLE_LABELS[role] : ''}
+            {role ? `${tier} · ${ROLE_LABELS[role]}` : ''}
           </p>
         </div>
       </div>
-      <div className="mt-1 grid grid-cols-2 gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="tap-target justify-start"
-          onClick={() => setTheme(dark ? 'light' : 'dark')}
-          aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-        >
-          {dark ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
-          <span className="truncate">{dark ? 'Light' : 'Dark'}</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="tap-target justify-start"
+      <div className="mt-1 flex items-center gap-1.5">
+        <ThemeSwitch />
+        <IconButton
+          label="Sign out"
           onClick={() => void signOut()}
+          className="h-9 w-9 min-h-0 min-w-0"
         >
           <LogOut className="h-4 w-4" aria-hidden />
-          <span className="truncate">Sign out</span>
-        </Button>
+        </IconButton>
       </div>
     </div>
   )
@@ -277,7 +330,12 @@ function MobileDrawer({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+    <div
+      className="fixed inset-0 z-50 lg:hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Navigation"
+    >
       <div
         className="absolute inset-0 bg-slate-900/60 animate-overlay-in backdrop-blur-[2px]"
         onClick={onClose}
@@ -287,21 +345,13 @@ function MobileDrawer({
         ref={panelRef}
         className="relative flex h-full w-[min(19rem,85vw)] flex-col bg-white shadow-2xl animate-drawer-in dark:bg-slate-900"
       >
-        {/*
-          The close button sits inside the same bordered row as the brand, so
-          the divider runs the full width of the drawer rather than stopping
-          short of it.
-        */}
-        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-slate-200 pl-4 pr-2 dark:border-slate-800">
-          <BrandIdentity />
-          <button
-            type="button"
-            aria-label="Close navigation"
-            onClick={onClose}
-            className="tap-target grid shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-          >
+        <div className="flex h-[4.25rem] shrink-0 items-center gap-2.5 border-b border-slate-200 pl-4 pr-2 dark:border-slate-800">
+          <div className="min-w-0 flex-1">
+            <BrandIdentity />
+          </div>
+          <IconButton label="Close navigation" onClick={onClose}>
             <X className="h-5 w-5" aria-hidden />
-          </button>
+          </IconButton>
         </div>
 
         <NavList items={items} pendingCount={pendingCount} />
@@ -381,7 +431,9 @@ function BottomNav({
             aria-haspopup="dialog"
             className={cn(
               'flex h-16 w-full flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors',
-              moreActive ? 'text-brand-700 dark:text-brand-300' : 'text-slate-500 dark:text-slate-400',
+              moreActive
+                ? 'text-brand-700 dark:text-brand-300'
+                : 'text-slate-500 dark:text-slate-400',
             )}
           >
             <MoreHorizontal className="h-5 w-5" aria-hidden />
@@ -400,6 +452,7 @@ function BottomNav({
 export function AppLayout() {
   const { hospital, can } = useAuth()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const location = useLocation()
 
   // Mounted here rather than on the notifications page: an incoming critical
@@ -413,19 +466,27 @@ export function AppLayout() {
 
   useEffect(() => {
     setDrawerOpen(false)
+    setPaletteOpen(false)
   }, [location.pathname])
 
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+  const openPalette = useCallback(() => setPaletteOpen(true), [])
+  const closePalette = useCallback(() => setPaletteOpen(false), [])
+  useSearchShortcut(openPalette)
 
-  const visibleNav = NAV_ITEMS.filter((item) => !item.capability || can(item.capability))
+  const visibleNav = NAV_ITEMS.filter(
+    (item) =>
+      (!item.capability || can(item.capability)) && (!item.requiresHospital || Boolean(hospital)),
+  )
   const bottomNav = visibleNav.slice(0, BOTTOM_NAV_SLOTS)
   const unreadCount = unread.data ?? 0
+  const shortcut = isApplePlatform() ? '⌘K' : 'Ctrl K'
 
   return (
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-brand-fg"
       >
         Skip to content
       </a>
@@ -454,46 +515,72 @@ export function AppLayout() {
           <div className="flex h-14 items-center gap-2 px-gutter">
             {/* Phones reach the full nav through the tab bar's More tab, so
                 the hamburger is only needed at tablet widths. */}
-            <button
-              type="button"
-              aria-label="Open navigation"
+            <IconButton
+              label="Open navigation"
               aria-haspopup="dialog"
               aria-expanded={drawerOpen}
-              className="tap-target -ml-2 hidden place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 md:grid lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
+              className="-ml-2 hidden md:grid lg:hidden"
               onClick={() => setDrawerOpen(true)}
             >
-              <Menu className="h-5 w-5" aria-hidden />
-            </button>
+              <MenuIcon className="h-5 w-5" aria-hidden />
+            </IconButton>
 
             <div className="min-w-0 flex-1">
               {hospital ? (
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
-                    {hospital.name}
-                  </span>
-                  {readiness.data && (
-                    <StatusDot
-                      status={readiness.data.status}
-                      label={`${readiness.data.green}/${readiness.data.total} current`}
-                      pulse
-                      className="hidden xs:inline-flex"
-                    />
-                  )}
-                  {!hospital.accepts_referrals && (
-                    <Badge tone="danger" className="hidden sm:inline-flex">
-                      Not accepting referrals
-                    </Badge>
-                  )}
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <HospitalLogo hospital={hospital} size="sm" className="hidden xs:inline-grid" />
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        {hospital.name}
+                      </span>
+                      {!hospital.accepts_referrals && (
+                        <Badge tone="danger" className="hidden sm:inline-flex">
+                          Not accepting referrals
+                        </Badge>
+                      )}
+                    </div>
+                    {readiness.data && (
+                      <StatusDot
+                        status={readiness.data.status}
+                        label={`${readiness.data.green}/${readiness.data.total} departments current`}
+                        pulse
+                        className="hidden xs:inline-flex"
+                      />
+                    )}
+                  </div>
                 </div>
               ) : (
-                <span className="text-sm text-slate-500 dark:text-slate-400">All hospitals</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                  <span className="truncate text-sm font-medium text-slate-600 dark:text-slate-300">
+                    Network-wide view
+                  </span>
+                </div>
               )}
             </div>
+
+            <button
+              type="button"
+              onClick={openPalette}
+              aria-label={`Search (${shortcut})`}
+              aria-keyshortcuts="Control+K Meta+K"
+              className="hidden h-9 w-60 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 transition-colors hover:border-slate-300 hover:bg-white md:flex xl:w-72 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+            >
+              <Search className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex-1 truncate text-left">Search hospitals, referrals…</span>
+              <Kbd>{shortcut}</Kbd>
+            </button>
+            <IconButton label="Search" className="md:hidden" onClick={openPalette}>
+              <Search className="h-5 w-5" aria-hidden />
+            </IconButton>
 
             <NavLink
               to="/notifications"
               className="tap-target relative -mr-2 grid shrink-0 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+              aria-label={
+                unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+              }
             >
               <Bell className="h-5 w-5" aria-hidden />
               {unreadCount > 0 && (
@@ -520,6 +607,8 @@ export function AppLayout() {
         onMore={() => setDrawerOpen(true)}
         moreActive={drawerOpen}
       />
+
+      <CommandPalette open={paletteOpen} onClose={closePalette} />
     </div>
   )
 }

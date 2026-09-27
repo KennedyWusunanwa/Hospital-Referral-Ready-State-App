@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
+import { BrandLogo } from '@/components/brand/BrandLogo'
 import {
   Alert,
   Button,
@@ -29,7 +30,6 @@ import {
 } from '@/components/ui'
 import { useBranding } from '@/features/branding/useBranding'
 import { humanizeSupabaseError } from '@/lib/supabase'
-import { useAuthPageTheme } from './authTheme'
 
 /** Long enough that a slow inbox is not mistaken for a failed send. */
 const RESEND_COOLDOWN_SECONDS = 30
@@ -65,7 +65,7 @@ type OtpEmailValues = z.infer<typeof otpEmailSchema>
 type OtpCodeValues = z.infer<typeof otpCodeSchema>
 
 function BrandPanel() {
-  const { appName, appTagline, logoUrl } = useBranding()
+  const { appTagline } = useBranding()
   return (
     <aside className="relative hidden overflow-hidden bg-brand-700 lg:flex lg:flex-col lg:justify-between lg:p-12 dark:bg-brand-950">
       <div
@@ -78,24 +78,10 @@ function BrandPanel() {
       />
 
       <div className="relative">
-        <div className="flex items-center gap-3">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt=""
-              className="h-11 w-11 rounded-xl bg-white/15 object-contain p-1 ring-1 ring-white/25"
-              aria-hidden
-            />
-          ) : (
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 text-base font-bold text-white ring-1 ring-white/25">
-              {appName.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-lg font-semibold text-white">{appName}</p>
-            <p className="truncate text-sm text-brand-100">{appTagline}</p>
-          </div>
-        </div>
+        {/* The panel is brand-coloured whatever the theme, so it always takes
+            the light artwork. */}
+        <BrandLogo surface="dark" className="h-14 w-auto" />
+        <p className="mt-3 text-sm text-brand-100">{appTagline}</p>
 
         <h2 className="mt-14 max-w-md text-3xl font-semibold leading-tight text-white">
           Know which hospital can take the patient before the ambulance moves.
@@ -121,8 +107,7 @@ function BrandPanel() {
 }
 
 export default function LoginPage() {
-  const { appName, appTagline, logoUrl, supportEmail } = useBranding()
-  useAuthPageTheme()
+  const { appName, appTagline, supportEmail } = useBranding()
 
   const { signInWithPassword, signInWithOtp, verifyOtp, requestPasswordReset } = useAuth()
 
@@ -246,20 +231,9 @@ export default function LoginPage() {
 
       <main className="flex min-h-dvh items-center justify-center px-4 py-10 sm:px-6">
         <div className="w-full max-w-md">
-          <div className="mb-6 flex items-center gap-3 lg:hidden">
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="h-10 w-10 rounded-xl object-contain" aria-hidden />
-            ) : (
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-sm font-bold text-brand-fg">
-                {appName.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
-                {appName}
-              </p>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{appTagline}</p>
-            </div>
+          <div className="mb-6 lg:hidden">
+            <BrandLogo className="h-10 w-auto" />
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{appTagline}</p>
           </div>
 
           <Card>

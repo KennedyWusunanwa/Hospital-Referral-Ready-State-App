@@ -58,11 +58,11 @@ const today = () => new Date().toISOString().slice(0, 10)
 const daysAgo = (days: number) =>
   new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
 
-export default function AuditLogViewer() {
+export default function AuditLogViewer({ networkWide = false }: { networkWide?: boolean }) {
   const { hospital, can, timezone } = useAuth()
   const seesEveryHospital = can('admin:system')
 
-  const [allHospitals, setAllHospitals] = useState(false)
+  const [allHospitals, setAllHospitals] = useState(networkWide || (seesEveryHospital && !hospital))
   const [filters, setFilters] = useState<AuditLogFilters>({
     from: daysAgo(30),
     to: today(),
@@ -210,7 +210,7 @@ export default function AuditLogViewer() {
           </Field>
         </div>
 
-        {seesEveryHospital && (
+        {seesEveryHospital && !networkWide && hospital && (
           <Checkbox
             label="Include every hospital"
             description="Off shows only events recorded against your own facility."

@@ -2,74 +2,86 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, MapPin, Navigation } from 'lucide-react'
 import { Badge, Card, Skeleton, StatusDot } from '@/components/ui'
 import { formatDistance } from '@/domain/geo'
-import { useHospitalReadiness } from '@/features/readiness/useReadiness'
 import { HOSPITAL_LEVEL_LABELS, READINESS_LABELS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
-import type { Hospital } from '@/lib/types'
+import type { Hospital, HospitalReadinessSummary } from '@/lib/types'
 import { CallLink } from './HospitalContactLinks'
+import { HospitalLogo } from './HospitalLogo'
 
 export interface HospitalCardProps {
   hospital: Hospital
   /** Straight-line distance from the viewer's own hospital, when both are geocoded. */
   distanceKm: number | null
   isOwn: boolean
+  /**
+   * The roll-up from `useNetworkReadiness`. `undefined` while loading; `null`
+   * when the hospital has no departments configured.
+   */
+  readiness?: HospitalReadinessSummary | null
 }
 
 /** The rolled-up traffic light, always paired with words rather than colour alone. */
-function ReadinessLine({ hospitalId }: { hospitalId: string }) {
-  const readiness = useHospitalReadiness(hospitalId)
+function ReadinessLine({ readiness }: { readiness: HospitalReadinessSummary | null | undefined }) {
+  if (readiness === undefined) return <Skeleton className="h-4 w-28" />
 
-  if (readiness.isPending) return <Skeleton className="h-4 w-28" />
-
-  if (readiness.isError || !readiness.data) {
-    return <span className="hint">Readiness unavailable</span>
+  if (readiness === null || readiness.total === 0) {
+    return <span className="hint">No reporting departments</span>
   }
 
-  const { status, green, total } = readiness.data
+  const { status, green, total } = readiness
   return (
     <span className="inline-flex items-center gap-2">
       <StatusDot status={status} label={READINESS_LABELS[status]} pulse={status !== 'green'} />
       <span className="hint">
-        {total > 0 ? `${green}/${total} departments current` : 'No reporting departments'}
+        {green}/{total} departments current
       </span>
     </span>
   )
 }
 
-export function HospitalCard({ hospital, distanceKm, isOwn }: HospitalCardProps) {
+export function HospitalCard({ hospital, distanceKm, isOwn, readiness }: HospitalCardProps) {
   const place = [hospital.city, hospital.region].filter(Boolean).join(', ')
   const levelLabel = HOSPITAL_LEVEL_LABELS[hospital.level] ?? hospital.level
 
   return (
     <Card
       className={cn(
-        'flex flex-col p-4',
-        isOwn && 'ring-2 ring-brand-500 ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-950',
+        'flex flex-col p-4 transition-shadow hover:shadow-md',
+        isOwn &&
+          'ring-2 ring-brand-500 ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-950',
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            <Link
-              to={`/hospitals/${hospital.id}`}
-              className="hover:text-brand-700 hover:underline dark:hover:text-brand-400"
-            >
-              {hospital.name}
-            </Link>
-          </h3>
+      <div className="flex items-start gap-3">
+        <HospitalLogo hospital={hospital} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="min-w-0 text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <Link
+                to={`/hospitals/${hospital.id}`}
+                className="hover:text-brand-700 hover:underline dark:hover:text-brand-400"
+              >
+                {hospital.name}
+              </Link>
+            </h3>
+            {isOwn && (
+              <Badge tone="brand" className="shrink-0">
+                Yours
+              </Badge>
+            )}
+          </div>
           <p className="mt-0.5 hint">
             {hospital.code} &middot; {levelLabel}
           </p>
+          {!hospital.is_active && (
+            <Badge tone="neutral" className="mt-1">
+              Inactive
+            </Badge>
+          )}
         </div>
-        {isOwn && (
-          <Badge tone="brand" className="shrink-0">
-            Your hospital
-          </Badge>
-        )}
       </div>
 
       <div className="mt-3 space-y-1.5">
-        <ReadinessLine hospitalId={hospital.id} />
+        <ReadinessLine readiness={readiness} />
         <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
           <span className="truncate">{place || 'Location not recorded'}</span>

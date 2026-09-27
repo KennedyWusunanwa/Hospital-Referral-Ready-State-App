@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { Check, Eye, EyeOff, X } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
+import { BrandLogo } from '@/components/brand/BrandLogo'
 import {
   Alert,
   Button,
@@ -19,7 +20,6 @@ import {
 } from '@/components/ui'
 import { APP_NAME, APP_TAGLINE, SUPPORT_EMAIL } from '@/lib/constants'
 import { humanizeSupabaseError } from '@/lib/supabase'
-import { useAuthPageTheme } from './authTheme'
 
 const PASSWORD_RULES = [
   { id: 'length', label: 'At least 12 characters', test: (value: string) => value.length >= 12 },
@@ -62,14 +62,9 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-dvh items-center justify-center px-4 py-10 sm:px-6">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-600 text-sm font-bold text-white">
-            {APP_NAME.slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <p className="text-base font-semibold text-slate-900 dark:text-slate-50">{APP_NAME}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{APP_TAGLINE}</p>
-          </div>
+        <div className="mb-6">
+          <BrandLogo className="h-10 w-auto" />
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{APP_TAGLINE}</p>
         </div>
         {children}
         <p className="mt-5 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
@@ -88,8 +83,6 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 export default function ResetPasswordPage() {
-  useAuthPageTheme()
-
   const { session, profile, loading, updatePassword, refreshProfile, signOut } = useAuth()
   const navigate = useNavigate()
 
@@ -150,7 +143,7 @@ export default function ResetPasswordPage() {
             </Alert>
             <Link
               to="/login"
-              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-700"
+              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-brand-fg transition-colors hover:bg-brand-700"
             >
               Back to sign in
             </Link>
@@ -262,7 +255,11 @@ export default function ResetPasswordPage() {
               </ul>
             </div>
 
-            <Field label="Confirm new password" required error={form.formState.errors.confirm?.message}>
+            <Field
+              label="Confirm new password"
+              required
+              error={form.formState.errors.confirm?.message}
+            >
               {({ id, describedBy }) => (
                 <Input
                   id={id}

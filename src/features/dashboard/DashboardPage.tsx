@@ -8,7 +8,7 @@
  */
 
 import { Link } from 'react-router-dom'
-import { Clock, Plus, ShieldAlert } from 'lucide-react'
+import { ArrowRight, Clock, Plus, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { useAuth, useCurrentHospitalId } from '@/auth/AuthProvider'
 import { Gate } from '@/auth/RequireAuth'
 import {
@@ -49,13 +49,13 @@ function NewReferralCta() {
           Need to move a patient?
         </h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Enter the emergency and we rank nearby hospitals on resources, distance and readiness -
-          no patient identifiers required.
+          Enter the emergency and we rank nearby hospitals on resources, distance and readiness - no
+          patient identifiers required.
         </p>
       </div>
       <Link
         to="/referrals/new"
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-brand-fg transition-colors hover:bg-brand-700"
       >
         <Plus className="h-4 w-4" aria-hidden />
         New referral
@@ -99,7 +99,9 @@ export default function DashboardPage() {
   const header = (
     <PageHeader
       title={greeting}
-      description={hospital ? `${hospital.name} - ${roleLabel}` : `${roleLabel} - network-wide view`}
+      description={
+        hospital ? `${hospital.name} - ${roleLabel}` : `${roleLabel} - network-wide view`
+      }
       actions={
         <>
           {shiftChip}
@@ -115,6 +117,30 @@ export default function DashboardPage() {
         {header}
         {can('admin:system') ? (
           <>
+            <Card className="flex flex-col justify-between gap-4 border-brand-200 bg-brand-50 p-5 dark:border-brand-900 dark:bg-brand-950/40 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 items-start gap-3">
+                <ShieldCheck
+                  className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400"
+                  aria-hidden
+                />
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+                    You are running the network
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    Hospitals, accounts, sign-ins, the emergency catalogue, scoring and branding are
+                    all managed from the system console.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/console"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-brand-fg transition-colors hover:bg-brand-700"
+              >
+                Open the console
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </Card>
             <NetworkOverview now={now} />
             <Gate capability="reports:view">
               <ReferralTrendPanel

@@ -6,7 +6,7 @@ import type { Hospital } from '@/lib/types'
 // One literal, not a concatenation: supabase-js parses this string at the type
 // level and a joined expression widens to `string`, which loses the row type.
 const HOSPITAL_COLUMNS =
-  'id, name, code, level, address, city, region, country, latitude, longitude, phone, emergency_phone, email, timezone, is_active, accepts_referrals, notes, created_at, updated_at'
+  'id, name, code, level, address, city, region, country, latitude, longitude, phone, emergency_phone, email, timezone, is_active, accepts_referrals, notes, logo_url, created_at, updated_at'
 
 /** The directory changes rarely; a long stale time keeps card lists from refetching. */
 const DIRECTORY_STALE_MS = 5 * 60_000
@@ -16,6 +16,8 @@ export interface HospitalFilters {
   region?: string
   /** Defaults to true -- a decommissioned facility should not be referrable. */
   onlyActive?: boolean
+  /** Defaults to true. Pass false to register the query without fetching yet. */
+  enabled?: boolean
 }
 
 /**
@@ -24,25 +26,27 @@ export interface HospitalFilters {
  * filter rather than be matched literally.
  */
 function sanitiseSearchTerm(term: string): string {
-  return term.replace(/[,()%\*"']/g, ' ').replace(/\s+/g, ' ').trim()
+  return term
+    .replace(/[,()%\*"']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function useHospitals(filters: HospitalFilters = {}): UseQueryResult<Hospital[]> {
-  const { region, onlyActive = true } = filters
+  const { region, onlyActive = true, enabled = true } = filters
   const search = sanitiseSearchTerm(filters.search ?? '')
 
   return useQuery({
     queryKey: queryKeys.hospitals.list({ search, region: region ?? null, onlyActive }),
     staleTime: DIRECTORY_STALE_MS,
+    enabled,
     queryFn: async () => {
       let query = supabase.from('hospitals').select(HOSPITAL_COLUMNS).order('name')
 
       if (onlyActive) query = query.eq('is_active', true)
       if (region) query = query.eq('region', region)
       if (search) {
-        query = query.or(
-          `name.ilike.%${search}%,code.ilike.%${search}%,city.ilike.%${search}%`,
-        )
+        query = query.or(`name.ilike.%${search}%,code.ilike.%${search}%,city.ilike.%${search}%`)
       }
 
       const { data, error } = await query

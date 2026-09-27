@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Building2, ClipboardList, Pencil, Plus, PowerOff, RotateCcw } from 'lucide-react'
+import { Building2, ClipboardList, Pencil, Plus, PowerOff, RotateCcw, Search } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import {
   Alert,
@@ -18,6 +18,7 @@ import {
   Input,
   LoadingBlock,
   Modal,
+  SearchInput,
   Select,
   Toggle,
 } from '@/components/ui'
@@ -229,7 +230,11 @@ function DeactivateModal({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="danger" loading={deleteDepartment.isPending} onClick={() => void confirm()}>
+          <Button
+            variant="danger"
+            loading={deleteDepartment.isPending}
+            onClick={() => void confirm()}
+          >
             Retire department
           </Button>
         </>
@@ -254,9 +259,20 @@ function DeactivateModal({
   )
 }
 
-export default function DepartmentManager() {
+export interface DepartmentManagerProps {
+  /** Overrides the signed-in user's hospital -- the system console manages any facility. */
+  hospitalId?: string | null
+  hospitalName?: string | null
+}
+
+export default function DepartmentManager({
+  hospitalId: hospitalIdProp,
+  hospitalName,
+}: DepartmentManagerProps = {}) {
   const { hospital } = useAuth()
-  const hospitalId = hospital?.id ?? null
+  const hospitalId = hospitalIdProp === undefined ? (hospital?.id ?? null) : hospitalIdProp
+  const facilityName = hospitalName ?? hospital?.name ?? null
+
   const departments = useAdminDepartments(hospitalId)
   const upsertDepartment = useUpsertDepartment()
 
@@ -264,7 +280,26 @@ export default function DepartmentManager() {
   const [editing, setEditing] = useState<Department | null>(null)
   const [deactivating, setDeactivating] = useState<Department | null>(null)
 
-  if (!hospital || !hospitalId) {
+  const [search, setSearch] = useState('')
+  const [template, setTemplate] = useState<DepartmentTemplateKey | 'all'>('all')
+  const [showRetired, setShowRetired] = useState(false)
+
+  const rows = useMemo(() => departments.data ?? [], [departments.data])
+  const retiredCount = rows.filter((row) => !row.is_active).length
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return rows.filter((row) => {
+      if (!showRetired && !row.is_active) return false
+      if (template !== 'all' && row.template_key !== template) return false
+      if (!term) return true
+      return `${row.name} ${DEPARTMENT_TEMPLATES[row.template_key]?.label ?? ''} ${row.contact_phone ?? ''}`
+        .toLowerCase()
+        .includes(term)
+    })
+  }, [rows, search, template, showRetired])
+
+  if (!hospitalId) {
     return (
       <Card>
         <EmptyState
@@ -299,11 +334,17 @@ export default function DepartmentManager() {
     setFormOpen(true)
   }
 
+  const filtersActive = search !== '' || template !== 'all' || showRetired
+
   return (
     <Card>
       <CardHeader
         title="Departments"
-        description="Each department reports its own readiness once per shift."
+        description={
+          facilityName
+            ? `Each department at ${facilityName} reports its own readiness once per shift.`
+            : 'Each department reports its own readiness once per shift.'
+        }
         action={
           <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4" aria-hidden />
@@ -312,13 +353,45 @@ export default function DepartmentManager() {
         }
       />
 
+      {rows.length > 0 && (
+        <CardBody className="border-b border-slate-200 py-3 dark:border-slate-800">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <SearchInput
+              containerClassName="flex-1"
+              value={search}
+              onChange={setSearch}
+              placeholder="Search departments"
+              aria-label="Search departments"
+            />
+            <Select
+              className="lg:w-56"
+              aria-label="Filter by template"
+              value={template}
+              onChange={(event) => setTemplate(event.target.value as DepartmentTemplateKey | 'all')}
+            >
+              <option value="all">All templates</option>
+              {DEPARTMENT_TEMPLATE_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {DEPARTMENT_TEMPLATES[key].label}
+                </option>
+              ))}
+            </Select>
+            <Toggle
+              checked={showRetired}
+              onChange={setShowRetired}
+              label={`Show retired${retiredCount > 0 ? ` (${retiredCount})` : ''}`}
+            />
+          </div>
+        </CardBody>
+      )}
+
       {departments.isLoading ? (
         <LoadingBlock label="Loading departments" rows={4} />
       ) : departments.isError ? (
         <CardBody>
           <ErrorBlock error={departments.error} onRetry={() => void departments.refetch()} />
         </CardBody>
-      ) : (departments.data?.length ?? 0) === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={<ClipboardList className="h-8 w-8" />}
           title="No departments yet"
@@ -330,10 +403,33 @@ export default function DepartmentManager() {
             </Button>
           }
         />
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={<Search className="h-8 w-8" />}
+          title="No departments match"
+          description={
+            filtersActive && !showRetired && retiredCount > 0
+              ? 'Retired departments are hidden. Switch them on or clear the search.'
+              : 'Clear the search or choose another template.'
+          }
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearch('')
+                setTemplate('all')
+                setShowRetired(false)
+              }}
+            >
+              Clear filters
+            </Button>
+          }
+        />
       ) : (
         <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-          {departments.data?.map((department) => {
-            const template = DEPARTMENT_TEMPLATES[department.template_key]
+          {visible.map((department) => {
+            const templateDef = DEPARTMENT_TEMPLATES[department.template_key]
             return (
               <li
                 key={department.id}
@@ -344,16 +440,16 @@ export default function DepartmentManager() {
                     <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                       {department.name}
                     </p>
-                    <Badge tone="brand">{template?.label ?? department.template_key}</Badge>
+                    <Badge tone="brand">{templateDef?.label ?? department.template_key}</Badge>
                     {!department.is_active && <Badge tone="neutral">Retired</Badge>}
                     {department.is_active && !department.requires_shift_update && (
                       <Badge tone="warning">No shift update required</Badge>
                     )}
                   </div>
                   <p className="mt-1 hint">
-                    {template
-                      ? `${template.resources.length} readiness ${
-                          template.resources.length === 1 ? 'field' : 'fields'
+                    {templateDef
+                      ? `${templateDef.resources.length} readiness ${
+                          templateDef.resources.length === 1 ? 'field' : 'fields'
                         }`
                       : 'Unknown template'}
                     {department.contact_phone ? ` - ${department.contact_phone}` : ''}

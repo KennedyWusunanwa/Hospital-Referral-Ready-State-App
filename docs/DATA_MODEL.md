@@ -628,6 +628,54 @@ privilege is revoked from `anon` and `authenticated`. No client ever reads it.
 
 ---
 
+## 17. `app_settings`
+
+One row, `id = 1`, holding the network's branding. Readable by **anon** on purpose: the sign-in
+screen paints the logo and brand colour before anybody has a session. Writable by `super_admin`.
+
+| Column | Type | Null | Default | Meaning |
+| --- | --- | :---: | --- | --- |
+| `brand_color` | `text` | no | `'#1b5cf5'` | Six-digit hex; the other ten shades are derived in the client |
+| `logo_url` | `text` | yes | — | Logo for **light** surfaces (dark artwork). Blank = built-in FERN wordmark |
+| `logo_dark_url` | `text` | yes | — | Logo for **dark** surfaces (light artwork). Blank = built-in FERN wordmark |
+| `logo_mode` | `text` | no | `'auto'` | `auto` follows the viewer's theme; `light` / `dark` pin one variant |
+| `app_name` | `text` | no | `'FERN'` | |
+| `app_tagline` | `text` | no | `'Referral Ready State'` | |
+| `support_email` | `text` | yes | — | |
+| `updated_at`, `updated_by` | | | | `updated_by` defaults to `auth.uid()` server-side |
+
+## 18. `staff_invites`
+
+The role and hospital an email address should receive on first sign-in — the only privileged
+input the signup trigger trusts. One live invite per address (`lower(email)`, unique while
+`accepted_at is null`); expires after 30 days. Managed by `super_admin` for the network and by
+`hospital_admin` for their own facility (who cannot mint a `super_admin`).
+
+## 19. `login_events`
+
+One row per successful sign-in, written only by `record_login()`. Feeds the system console's
+sign-in log and statistics, and "last signed in" on staff lists.
+
+| Column | Type | Null | Default | Meaning |
+| --- | --- | :---: | --- | --- |
+| `id` | `uuid` | no | `gen_random_uuid()` | Primary key |
+| `user_id` | `uuid` | yes | — | → `profiles.id`, `on delete cascade` |
+| `email` | `text` | yes | — | From the JWT at the time; denormalised so history survives a rename |
+| `role` | `text` | yes | — | Denormalised at write time |
+| `hospital_id` | `uuid` | yes | — | → `hospitals.id`; scopes `hospital_admin` visibility |
+| `method` | `text` | no | `'unknown'` | `password`, `otp`, `recovery` or `unknown` |
+| `user_agent` | `text` | yes | — | Truncated to 512 characters |
+| `ip_address` | `text` | yes | — | First hop of `x-forwarded-for`, read server-side from the request headers |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+Visibility: a person sees their own rows; a `hospital_admin` sees their facility's; a
+`super_admin` sees everything. No client role may insert, update or delete.
+
+**Also added in 0006:** `hospitals.logo_url` (public URL of the facility logo, uploaded to the
+`hospital-logos` bucket under `<hospital_id>/` or pasted as an https link), and the
+`ensure_hospital_defaults()` trigger, which gives a newly created hospital its
+`hospital_resources` row and eight `blood_stock` rows immediately.
+
 ## Indexes
 
 Every index below is there because a query the application actually issues needs it. There are no

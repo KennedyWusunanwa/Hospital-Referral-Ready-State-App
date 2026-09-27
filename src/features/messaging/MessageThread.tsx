@@ -26,7 +26,8 @@ import {
 
 /** Statuses after which the thread is kept as a record but closed to new posts. */
 const CLOSED_STATUS_NOTE: Partial<Record<ReferralStatus, string>> = {
-  declined: 'This referral was declined, so the thread is closed. Raise a new referral to continue.',
+  declined:
+    'This referral was declined, so the thread is closed. Raise a new referral to continue.',
   completed: 'This transfer is complete. The thread is kept as part of the referral record.',
   cancelled: 'This referral was cancelled, so the thread is closed.',
   expired: 'This referral expired without a response, so the thread is closed.',
@@ -263,7 +264,7 @@ function MessageRow({
             className={cn(
               'mt-1 whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm',
               own
-                ? 'rounded-br-sm bg-brand-600 text-white'
+                ? 'rounded-br-sm bg-brand-600 text-brand-fg'
                 : 'rounded-bl-sm bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100',
               pending && 'opacity-70',
             )}

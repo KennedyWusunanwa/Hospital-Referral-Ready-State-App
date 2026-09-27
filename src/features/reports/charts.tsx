@@ -51,7 +51,7 @@ export function useIsDarkTheme(): boolean {
   return dark
 }
 
-interface ChartTokens {
+export interface ChartTokens {
   axis: string
   grid: string
   tooltipBg: string
@@ -60,7 +60,7 @@ interface ChartTokens {
   reference: string
 }
 
-function tokensFor(dark: boolean): ChartTokens {
+export function tokensFor(dark: boolean): ChartTokens {
   return dark
     ? {
         axis: '#94a3b8',
@@ -81,7 +81,7 @@ function tokensFor(dark: boolean): ChartTokens {
 }
 
 /** Categorical palette, light/dark pairs. */
-const CATEGORICAL = [
+export const CATEGORICAL = [
   { light: '#1b5cf5', dark: '#7aa8ff' },
   { light: '#0f766e', dark: '#4ed3ab' },
   { light: '#b45309', dark: '#f0a94c' },
@@ -92,12 +92,12 @@ const CATEGORICAL = [
   { light: '#9a3412', dark: '#fb923c' },
 ] as const
 
-function categorical(index: number, dark: boolean): string {
+export function categorical(index: number, dark: boolean): string {
   const pair = CATEGORICAL[index % CATEGORICAL.length]
   return dark ? pair.dark : pair.light
 }
 
-const SERIES = {
+export const SERIES = {
   created: { light: '#1b5cf5', dark: '#7aa8ff' },
   accepted: { light: '#0f766e', dark: '#4ed3ab' },
   completed: { light: '#b45309', dark: '#f0a94c' },
@@ -110,7 +110,7 @@ function bandColor(rate: number, dark: boolean): string {
   return dark ? '#fb7185' : '#be123c'
 }
 
-function tooltipProps(t: ChartTokens) {
+export function tooltipProps(t: ChartTokens) {
   return {
     contentStyle: {
       background: t.tooltipBg,
@@ -126,13 +126,13 @@ function tooltipProps(t: ChartTokens) {
   }
 }
 
-const AXIS_TICK = { fontSize: 11 }
+export const AXIS_TICK = { fontSize: 11 }
 
 // ---------------------------------------------------------------------------
 // Shared frame
 // ---------------------------------------------------------------------------
 
-function ChartFrame({
+export function ChartFrame({
   height,
   ariaLabel,
   children,
@@ -150,7 +150,7 @@ function ChartFrame({
   )
 }
 
-function ChartEmpty({ height, message }: { height: number; message?: string }) {
+export function ChartEmpty({ height, message }: { height: number; message?: string }) {
   return (
     <div
       className="flex items-center justify-center rounded-lg border border-dashed border-slate-200 px-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400"
@@ -168,13 +168,13 @@ function ChartEmpty({ height, message }: { height: number; message?: string }) {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function shortDay(day: string): string {
+export function shortDay(day: string): string {
   const [, month, date] = day.split('-')
   const label = MONTHS[Number(month) - 1]
   return label && date ? date + ' ' + label : day
 }
 
-function longDay(day: string): string {
+export function longDay(day: string): string {
   const [year, month, date] = day.split('-')
   const label = MONTHS[Number(month) - 1]
   return label && date ? date + ' ' + label + ' ' + year : day

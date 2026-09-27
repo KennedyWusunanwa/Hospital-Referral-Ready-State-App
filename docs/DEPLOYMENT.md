@@ -56,6 +56,8 @@ re-running one is safe.
 | 2 | `0002_rls.sql` | Authorisation helper functions, row-level security policies on every table, the privilege-escalation guard trigger, table grants |
 | 3 | `0003_functions.sql` | The RPC surface — `get_referral_candidates`, `submit_readiness`, `create_referral`, `update_referral_status`, `flag_overdue_readiness`, `hospital_performance`, `referral_analytics`, `compliance_report`, `record_login`, `log_audit_event`, `mark_notifications_read` |
 | 4 | `0004_seed.sql` | Reference data — the emergency-type catalogue with its weighted requirements, and demo hospitals/departments for a pilot |
+| 5 | `0005_settings_and_invites.sql` | `app_settings` (network branding, readable by anon), `staff_invites` and the signup trigger that applies them, the `before_user_created` auth hook, the public `branding` storage bucket |
+| 6 | `0006_platform_console.sql` | `hospitals.logo_url`, light/dark network logos on `app_settings`, the `login_events` sign-in log, `record_login(method, agent)` / `record_logout()`, `platform_stats()` for the system console, a trigger that gives a new hospital its resource rows, and the public `hospital-logos` storage bucket |
 
 Confirm the actual filenames present in `supabase/migrations/` before you start; apply every file
 you find there, in ascending filename order.
@@ -136,8 +138,8 @@ skipping it leaves the deployment open.
 
 | Setting | Production value |
 | --- | --- |
-| Site URL | `https://fern.yourdomain.org` — your real origin, no trailing slash |
-| Redirect URLs | `https://fern.yourdomain.org/reset-password` and `https://fern.yourdomain.org/**` |
+| Site URL | `https://fern.yourdomain.org` — your real origin, no trailing slash. Until the national domain is bought this is `https://hospital-ref.vercel.app` |
+| Redirect URLs | `https://fern.yourdomain.org/reset-password` and `https://fern.yourdomain.org/**` (today: the same two entries for `https://hospital-ref.vercel.app`) |
 
 Add `http://localhost:5173/**` **only** to a staging or development project. Never add a localhost
 or wildcard-domain entry to production: the allow-list is what stops a password-recovery link from
@@ -358,6 +360,17 @@ at runtime. So:
 ---
 
 ## 7. Custom domain and HSTS
+
+The app is currently served from the temporary Vercel host **https://hospital-ref.vercel.app**.
+That address is baked into three places that all have to change together when the national
+domain is bought:
+
+| Where | What to change |
+| --- | --- |
+| Vercel → Environment Variables | `VITE_APP_URL` → the new origin, then redeploy (build-time variable) |
+| `index.html` | the `<link rel="canonical">` and the `og:url` / `og:image` tags |
+| Supabase → Authentication → URL Configuration | Site URL and both redirect entries (section 3.3) |
+
 
 1. **Vercel → Project → Settings → Domains → Add**, e.g. `fern.yourdomain.org`.
 2. Create the DNS record Vercel shows — a `CNAME` to `cname.vercel-dns.com` for a subdomain, or the

@@ -17,7 +17,13 @@ export default defineConfig({
       // Registration happens in `usePWA`, so the virtual module stays the one
       // source of truth for update state.
       injectRegister: null,
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: [
+        'favicon.ico',
+        'favicon-32.png',
+        'favicon-16.png',
+        'apple-touch-icon.png',
+        'robots.txt',
+      ],
       manifest: {
         id: '/',
         name: 'FERN - Referral Ready State',

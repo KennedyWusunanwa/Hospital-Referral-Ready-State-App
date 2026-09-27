@@ -10,9 +10,9 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, humanizeSupabaseError } from '@/lib/supabase'
-import { DEFAULT_TIMEZONE, type Capability, type UserRole } from '@/lib/constants'
+import { DEFAULT_TIMEZONE, type Capability, type LoginMethod, type UserRole } from '@/lib/constants'
 import type { Hospital, Profile } from '@/lib/types'
-import { can as hasCapability } from '@/lib/utils'
+import { can as hasCapability, sleep } from '@/lib/utils'
 
 export interface AuthState {
   session: Session | null
@@ -41,11 +41,23 @@ export interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/**
+ * Records the sign-in (last_login_at, a login_events row and the audit trail).
+ * Best-effort on purpose: a failed bookkeeping call must never block a
+ * clinician who has just authenticated.
+ */
+async function recordLogin(method: LoginMethod): Promise<void> {
+  const userAgent = typeof navigator === 'undefined' ? null : navigator.userAgent
+  await supabase
+    .rpc('record_login', { p_method: method, p_user_agent: userAgent })
+    .then(undefined, () => undefined)
+}
+
 const PROFILE_COLUMNS =
   'id, full_name, email, phone, role, hospital_id, department_id, is_active, must_change_password, last_login_at, created_at, updated_at'
 
 const HOSPITAL_COLUMNS =
-  'id, name, code, level, address, city, region, country, latitude, longitude, phone, emergency_phone, email, timezone, is_active, accepts_referrals, notes, created_at, updated_at'
+  'id, name, code, level, address, city, region, country, latitude, longitude, phone, emergency_phone, email, timezone, is_active, accepts_referrals, notes, logo_url, created_at, updated_at'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -169,6 +181,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState((prev) => ({ ...prev, session }))
         return
       }
+      // A recovery link signs the person in without touching either sign-in
+      // form, so it is the one path that has to be recorded from here.
+      if (event === 'PASSWORD_RECOVERY') void recordLogin('recovery')
       void loadProfile(session)
     })
 
@@ -184,10 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     })
     if (error) throw new Error(humanizeSupabaseError(error))
-    // Best-effort: a failed audit write must not block a clinician signing in.
-    if (data.user) {
-      await supabase.rpc('record_login').then(undefined, () => undefined)
-    }
+    if (data.user) await recordLogin('password')
   }, [])
 
   const signInWithOtp = useCallback(async (email: string) => {
@@ -209,6 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       type: 'email',
     })
     if (error) throw new Error(humanizeSupabaseError(error))
+    await recordLogin('otp')
   }, [])
 
   const requestPasswordReset = useCallback(async (email: string) => {
@@ -233,6 +246,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     requestIdRef.current++
+    // The audit row is nice to have; a slow network must not hold the sign-out.
+    await Promise.race([
+      supabase.rpc('record_logout').then(undefined, () => undefined),
+      sleep(1500),
+    ])
     await supabase.auth.signOut()
     setState({
       session: null,

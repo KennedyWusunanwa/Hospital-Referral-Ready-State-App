@@ -1,6 +1,9 @@
 /**
  * The hospital's readiness board: which departments have reported this shift,
  * which have not, and how long is left to fix that before the shift rolls over.
+ *
+ * An account with no home hospital but network-wide rights (a system
+ * administrator) gets the whole network instead, grouped by facility.
  */
 
 import { AlertTriangle, CheckCircle2, Clock3, Gauge, XCircle } from 'lucide-react'
@@ -21,6 +24,7 @@ import { formatPercent } from '@/lib/utils'
 import { complianceRate } from '@/domain/readiness'
 import { formatDuration } from '@/domain/geo'
 import { getShiftAt, minutesLeftInShift } from '@/domain/shifts'
+import { NetworkReadinessBoard } from './NetworkReadinessBoard'
 import { ReadinessBoard } from './ReadinessBoard'
 import { useHospitalReadiness, useNowTick } from './useReadiness'
 
@@ -31,7 +35,7 @@ function shiftName(type: string): string {
 }
 
 export default function ReadinessPage() {
-  const { hospital, timezone } = useAuth()
+  const { hospital, timezone, can } = useAuth()
   const hospitalId = useCurrentHospitalId()
   const now = useNowTick()
   const summaryQuery = useHospitalReadiness(hospitalId)
@@ -42,6 +46,26 @@ export default function ReadinessPage() {
   const compliance = summary ? complianceRate(summary) : null
   const needsAction = summary ? summary.yellow + summary.red : 0
 
+  const shiftChip = (
+    <Badge tone="brand" className="px-3 py-1 text-sm">
+      <Clock3 className="h-4 w-4" aria-hidden />
+      {shiftName(shift.shiftType)} shift - {formatDuration(remaining)} remaining
+    </Badge>
+  )
+
+  if (!hospitalId && can('admin:system')) {
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title="Network readiness"
+          description={`Every facility's departments against the current shift. Shift times shown in ${timezone}.`}
+          actions={shiftChip}
+        />
+        <NetworkReadinessBoard />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -51,12 +75,7 @@ export default function ReadinessPage() {
             ? `${hospital.name} - shift times shown in ${timezone}`
             : 'Readiness reporting for your hospital'
         }
-        actions={
-          <Badge tone="brand" className="px-3 py-1 text-sm">
-            <Clock3 className="h-4 w-4" aria-hidden />
-            {shiftName(shift.shiftType)} shift - {formatDuration(remaining)} remaining
-          </Badge>
-        }
+        actions={shiftChip}
       />
 
       {summaryQuery.isError && (

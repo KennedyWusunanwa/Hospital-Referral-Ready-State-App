@@ -85,11 +85,11 @@ export type AuditLog = Tables<'audit_logs'>
 export interface ReferralWithRelations extends Referral {
   requesting_hospital: Pick<
     Hospital,
-    'id' | 'name' | 'code' | 'phone' | 'emergency_phone' | 'city' | 'region'
+    'id' | 'name' | 'code' | 'phone' | 'emergency_phone' | 'city' | 'region' | 'logo_url'
   > | null
   receiving_hospital: Pick<
     Hospital,
-    'id' | 'name' | 'code' | 'phone' | 'emergency_phone' | 'city' | 'region'
+    'id' | 'name' | 'code' | 'phone' | 'emergency_phone' | 'city' | 'region' | 'logo_url'
   > | null
   emergency_type: Pick<EmergencyType, 'id' | 'name' | 'code' | 'category'> | null
   requested_by_profile: Pick<Profile, 'id' | 'full_name' | 'phone'> | null

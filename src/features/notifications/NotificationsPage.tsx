@@ -1,34 +1,50 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BellOff, CheckCheck } from 'lucide-react'
+import { BellOff, CheckCheck, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Alert,
   Button,
   Card,
+  Chip,
   EmptyState,
   ErrorBlock,
+  Field,
+  FilterBar,
   LoadingBlock,
   PageHeader,
-  Tab,
-  TabList,
-  TabPanel,
-  Tabs,
+  SearchInput,
+  SegmentedControl,
+  Select,
 } from '@/components/ui'
 import { useAuth } from '@/auth/AuthProvider'
 import { getZonedParts } from '@/domain/shifts'
+import { NOTIFICATION_TYPES, type NotificationType } from '@/lib/constants'
 import type { AppNotification } from '@/lib/types'
+import { useUrlState } from '@/lib/useUrlState'
 import { formatDate } from '@/lib/utils'
-import { NotificationItem } from './NotificationItem'
+import { NotificationItem, TYPE_LABELS } from './NotificationItem'
 import {
+  NOTIFICATION_SEVERITIES,
   internalLink,
+  notificationSeverity,
   useMarkNotificationsRead,
   useNotificationRealtime,
   useNotifications,
   useUnreadNotificationCount,
+  type NotificationSeverity,
 } from './useNotifications'
 
 const MS_PER_DAY = 86_400_000
+
+const FILTER_DEFAULTS = { tab: 'unread', q: '', type: '', severity: '' }
+
+const SEVERITY_LABELS: Record<NotificationSeverity, string> = {
+  info: 'Info',
+  warning: 'Warning',
+  critical: 'Critical',
+}
+const SEVERITY_TONE = { info: 'brand', warning: 'warning', critical: 'danger' } as const
 
 interface DayGroup {
   key: string
@@ -70,7 +86,8 @@ function groupByDay(items: AppNotification[], timezone: string, now: Date): DayG
 export default function NotificationsPage() {
   const { timezone } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<'unread' | 'all'>('unread')
+  const { state, update, reset } = useUrlState(FILTER_DEFAULTS)
+  const tab = state.tab === 'all' ? 'all' : 'unread'
 
   useNotificationRealtime()
 
@@ -79,12 +96,29 @@ export default function NotificationsPage() {
   const unread = useUnreadNotificationCount()
   const markRead = useMarkNotificationsRead()
 
-  const groups = useMemo(
-    () => groupByDay(notifications.data ?? [], timezone, new Date()),
-    [notifications.data, timezone],
-  )
+  const filtered = useMemo(() => {
+    const rows = notifications.data ?? []
+    const needle = state.q.trim().toLowerCase()
+    return rows.filter((row) => {
+      if (state.type && row.type !== state.type) return false
+      if (state.severity && notificationSeverity(row.severity) !== state.severity) return false
+      if (!needle) return true
+      return `${row.title} ${row.body ?? ''} ${TYPE_LABELS[row.type]}`
+        .toLowerCase()
+        .includes(needle)
+    })
+  }, [notifications.data, state.q, state.type, state.severity])
+
+  const severityCounts = useMemo(() => {
+    const tally: Record<NotificationSeverity, number> = { info: 0, warning: 0, critical: 0 }
+    for (const row of notifications.data ?? []) tally[notificationSeverity(row.severity)] += 1
+    return tally
+  }, [notifications.data])
+
+  const groups = useMemo(() => groupByDay(filtered, timezone, new Date()), [filtered, timezone])
 
   const unreadCount = unread.data ?? 0
+  const activeFilters = (state.q ? 1 : 0) + (state.type ? 1 : 0) + (state.severity ? 1 : 0)
 
   function handleSelect(notification: AppNotification) {
     if (!notification.is_read) markRead.mutate({ ids: [notification.id] })
@@ -96,6 +130,18 @@ export default function NotificationsPage() {
     markRead.mutate({}, { onSuccess: () => toast.success('All notifications marked as read') })
   }
 
+  function handleMarkVisible() {
+    const ids = filtered.filter((row) => !row.is_read).map((row) => row.id)
+    if (ids.length === 0) return
+    markRead.mutate(
+      { ids },
+      {
+        onSuccess: () =>
+          toast.success(`${ids.length} notification${ids.length === 1 ? '' : 's'} marked as read`),
+      },
+    )
+  }
+
   const list = notifications.isPending ? (
     <LoadingBlock label="Loading notifications" rows={4} />
   ) : notifications.isError ? (
@@ -103,22 +149,39 @@ export default function NotificationsPage() {
       <ErrorBlock error={notifications.error} onRetry={() => void notifications.refetch()} />
     </div>
   ) : groups.length === 0 ? (
-    <EmptyState
-      icon={<BellOff className="h-8 w-8" aria-hidden />}
-      title={onlyUnread ? 'You are all caught up' : 'No notifications yet'}
-      description={
-        onlyUnread
-          ? 'Nothing needs your attention right now. New referrals, messages and readiness alerts will appear here.'
-          : 'Alerts about referrals, messages and readiness compliance will appear here.'
-      }
-      action={
-        onlyUnread ? (
-          <Button variant="outline" size="sm" onClick={() => setTab('all')}>
-            View all notifications
+    activeFilters > 0 ? (
+      <EmptyState
+        icon={<Search className="h-8 w-8" aria-hidden />}
+        title="No notifications match"
+        description="Clear the search or pick a different type or severity."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => update({ q: '', type: '', severity: '' })}
+          >
+            Clear filters
           </Button>
-        ) : undefined
-      }
-    />
+        }
+      />
+    ) : (
+      <EmptyState
+        icon={<BellOff className="h-8 w-8" aria-hidden />}
+        title={onlyUnread ? 'You are all caught up' : 'No notifications yet'}
+        description={
+          onlyUnread
+            ? 'Nothing needs your attention right now. New referrals, messages and readiness alerts will appear here.'
+            : 'Alerts about referrals, messages and readiness compliance will appear here.'
+        }
+        action={
+          onlyUnread ? (
+            <Button variant="outline" size="sm" onClick={() => update({ tab: 'all' })}>
+              View all notifications
+            </Button>
+          ) : undefined
+        }
+      />
+    )
   ) : (
     <div>
       {groups.map((group) => (
@@ -147,18 +210,91 @@ export default function NotificationsPage() {
         title="Notifications"
         description="Referral activity, messages and readiness compliance alerts addressed to you."
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleMarkAll}
-            loading={markRead.isPending}
-            disabled={unreadCount === 0}
-          >
-            <CheckCheck className="h-4 w-4" aria-hidden />
-            Mark all as read
-          </Button>
+          <>
+            {activeFilters > 0 && filtered.some((row) => !row.is_read) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMarkVisible}
+                loading={markRead.isPending}
+              >
+                Mark these as read
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkAll}
+              loading={markRead.isPending}
+              disabled={unreadCount === 0}
+            >
+              <CheckCheck className="h-4 w-4" aria-hidden />
+              Mark all as read
+            </Button>
+          </>
         }
       />
+
+      <FilterBar
+        activeCount={activeFilters}
+        onClear={() => reset(['tab'])}
+        summary={
+          notifications.data
+            ? `${filtered.length} ${onlyUnread ? 'unread' : ''} notification${filtered.length === 1 ? '' : 's'}${activeFilters > 0 ? ' match' : ''}`
+            : undefined
+        }
+        gridClassName="space-y-3"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <SegmentedControl
+            ariaLabel="Read state"
+            value={tab}
+            onChange={(next) => update({ tab: next })}
+            options={[
+              { value: 'unread', label: 'Unread', count: unreadCount },
+              { value: 'all', label: 'All' },
+            ]}
+          />
+          <SearchInput
+            containerClassName="flex-1"
+            value={state.q}
+            onChange={(value) => update({ q: value })}
+            placeholder="Search titles and messages"
+            aria-label="Search notifications"
+          />
+          <Field className="lg:w-56">
+            {({ id }) => (
+              <Select
+                id={id}
+                aria-label="Notification type"
+                value={state.type}
+                onChange={(e) => update({ type: e.target.value })}
+              >
+                <option value="">All types</option>
+                {NOTIFICATION_TYPES.map((type: NotificationType) => (
+                  <option key={type} value={type}>
+                    {TYPE_LABELS[type]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Severity</span>
+          {NOTIFICATION_SEVERITIES.map((severity) => (
+            <Chip
+              key={severity}
+              active={state.severity === severity}
+              onClick={() => update({ severity: state.severity === severity ? '' : severity })}
+              tone={SEVERITY_TONE[severity]}
+              count={severityCounts[severity]}
+            >
+              {SEVERITY_LABELS[severity]}
+            </Chip>
+          ))}
+        </div>
+      </FilterBar>
 
       <Alert tone="info" title="Where readiness alerts come from">
         <p>
@@ -173,27 +309,7 @@ export default function NotificationsPage() {
         </p>
       </Alert>
 
-      <Tabs
-        defaultValue="unread"
-        value={tab}
-        onValueChange={(value) => setTab(value === 'all' ? 'all' : 'unread')}
-      >
-        <TabList>
-          <Tab value="unread" count={unreadCount}>
-            Unread
-          </Tab>
-          <Tab value="all">All</Tab>
-        </TabList>
-
-        <div className="mt-4">
-          <TabPanel value="unread">
-            <Card className="overflow-hidden">{list}</Card>
-          </TabPanel>
-          <TabPanel value="all">
-            <Card className="overflow-hidden">{list}</Card>
-          </TabPanel>
-        </div>
-      </Tabs>
+      <Card className="overflow-hidden">{list}</Card>
     </div>
   )
 }

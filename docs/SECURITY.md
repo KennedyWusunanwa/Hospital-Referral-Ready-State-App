@@ -477,3 +477,22 @@ In priority order, and none of these is required for the contracted scope:
    (reduces T12).
 6. Schedule the **six-monthly restore drill** and the **quarterly access review** (who holds
    `super_admin`, who is still active) as recurring calendar items with a named owner.
+
+---
+
+## Sign-in log
+
+Since migration `0006`, every successful sign-in writes a `login_events` row: who, when, by which
+method (password, email code or recovery link), the browser's user-agent string and the first hop
+of the client address as seen by the API gateway. The address is read server-side from the request
+headers and cannot be supplied by the client.
+
+- **Purpose.** Answering "who was signed in when this happened?" during an incident, spotting an
+  account used from an unexpected place, and measuring adoption for the programme office.
+- **Access.** A person sees their own history; a hospital administrator sees their facility's; a
+  system administrator sees the network's. Nobody can edit or delete a row through the API.
+- **Retention.** The log is operational, not clinical. Purge rows older than twelve months with a
+  scheduled `delete from public.login_events where created_at < now() - interval '12 months'`,
+  or shorter if local data-protection guidance requires it.
+- **Export.** The system console can export the filtered log as CSV; each export is itself
+  recorded in `audit_logs` as `report.export`.

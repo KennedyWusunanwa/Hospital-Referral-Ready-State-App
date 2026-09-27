@@ -1,14 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import {
-  ArrowLeft,
-  Building2,
-  Clock,
-  MapPin,
-  Pencil,
-  Send,
-  Stethoscope,
-  Wind,
-} from 'lucide-react'
+import { ArrowLeft, Building2, Clock, MapPin, Pencil, Send, Stethoscope, Wind } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import {
   Alert,
@@ -31,12 +22,13 @@ import { cn, formatDateTime, relativeTime } from '@/lib/utils'
 import type { HospitalResources } from '@/lib/types'
 import { BloodStockTable } from './BloodStockTable'
 import { CallLink, EmailLink } from './HospitalContactLinks'
+import { HospitalLogo } from './HospitalLogo'
 import { HospitalResourcePanel } from './HospitalResourcePanel'
 import { useHospital } from './useHospitals'
 
 const ACTION_LINK =
   'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors'
-const ACTION_PRIMARY = 'bg-brand-600 text-white hover:bg-brand-700'
+const ACTION_PRIMARY = 'bg-brand-600 text-brand-fg hover:bg-brand-700'
 const ACTION_OUTLINE =
   'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800'
 
@@ -50,7 +42,10 @@ function CapacityStats({ resources }: { resources: HospitalResources | null }) {
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <Stat
         label="ICU beds free"
-        value={capacityStat(resources?.icu_beds_available ?? null, resources?.icu_beds_total ?? null)}
+        value={capacityStat(
+          resources?.icu_beds_available ?? null,
+          resources?.icu_beds_total ?? null,
+        )}
         sublabel="Available / total"
         icon={<Stethoscope className="h-4 w-4" />}
       />
@@ -164,7 +159,12 @@ export default function HospitalDetailPage() {
       {backLink}
 
       <PageHeader
-        title={hospital.name}
+        title={
+          <span className="flex items-center gap-3">
+            <HospitalLogo hospital={hospital} size="lg" />
+            <span>{hospital.name}</span>
+          </span>
+        }
         description={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium text-slate-600 dark:text-slate-300">{hospital.code}</span>
@@ -193,7 +193,14 @@ export default function HospitalDetailPage() {
               </Link>
             )}
             {canEditThisHospital && (
-              <Link to="/admin" className={cn(ACTION_LINK, ACTION_OUTLINE)}>
+              <Link
+                to={
+                  role === 'super_admin' && !isOwn
+                    ? `/console/hospitals?edit=${hospital.id}`
+                    : '/admin'
+                }
+                className={cn(ACTION_LINK, ACTION_OUTLINE)}
+              >
                 <Pencil className="h-4 w-4" aria-hidden />
                 Edit
               </Link>
@@ -213,7 +220,9 @@ export default function HospitalDetailPage() {
           <span className="hint">Readiness unavailable</span>
         )}
         {readiness && readiness.total > 0 && (
-          <Badge tone="neutral">{readiness.green}/{readiness.total} departments current</Badge>
+          <Badge tone="neutral">
+            {readiness.green}/{readiness.total} departments current
+          </Badge>
         )}
         {isOwn && <Badge tone="brand">Your hospital</Badge>}
         {!hospital.accepts_referrals && <Badge tone="danger">Not accepting referrals</Badge>}

@@ -135,10 +135,11 @@ function Stepper({ step, onNavigate }: { step: number; onNavigate: (target: numb
               aria-current={state === 'current' ? 'step' : undefined}
               className={cn(
                 'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                state === 'current' && 'bg-brand-600 text-white',
+                state === 'current' && 'bg-brand-600 text-brand-fg',
                 state === 'done' &&
                   'bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-950/40 dark:text-brand-300',
-                state === 'todo' && 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+                state === 'todo' &&
+                  'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
               )}
             >
               <span

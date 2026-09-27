@@ -18,7 +18,7 @@ import { cn, formatDateTime, relativeTime } from '@/lib/utils'
 import { internalLink, notificationSeverity, type NotificationSeverity } from './useNotifications'
 
 /** Notification types are not in the shared catalogue with labels, so name them here. */
-const TYPE_LABELS: Record<NotificationType, string> = {
+export const TYPE_LABELS: Record<NotificationType, string> = {
   readiness_overdue: 'Readiness overdue',
   referral_incoming: 'Incoming referral',
   referral_accepted: 'Referral accepted',

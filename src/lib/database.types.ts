@@ -29,6 +29,7 @@ export interface Database {
           is_active: boolean
           accepts_referrals: boolean
           notes: string | null
+          logo_url: string | null
           created_at: string
           updated_at: string
         }
@@ -50,6 +51,7 @@ export interface Database {
           is_active?: boolean
           accepts_referrals?: boolean
           notes?: string | null
+          logo_url?: string | null
         }
         Update: Partial<Database['public']['Tables']['hospitals']['Insert']>
         Relationships: []
@@ -437,6 +439,8 @@ export interface Database {
           id: number
           brand_color: string
           logo_url: string | null
+          logo_dark_url: string | null
+          logo_mode: string
           app_name: string
           app_tagline: string
           support_email: string | null
@@ -464,6 +468,24 @@ export interface Database {
         }
         Insert: Partial<Database['public']['Tables']['staff_invites']['Row']> & { email: string }
         Update: Partial<Database['public']['Tables']['staff_invites']['Row']>
+        Relationships: []
+      }
+
+      login_events: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string | null
+          role: string | null
+          hospital_id: string | null
+          method: string
+          user_agent: string | null
+          ip_address: string | null
+          created_at: string
+        }
+        /** Written only by `record_login()`; the client never inserts. */
+        Insert: never
+        Update: never
         Relationships: []
       }
     }
@@ -547,8 +569,19 @@ export interface Database {
       current_user_role: { Args: Record<string, never>; Returns: string | null }
       /** Null until an administrator attaches the profile to a hospital. */
       current_user_hospital: { Args: Record<string, never>; Returns: string | null }
-      /** Stamps `profiles.last_login_at` and writes an `auth.login` audit row. */
-      record_login: { Args: Record<string, never>; Returns: undefined }
+      /**
+       * Stamps `profiles.last_login_at`, writes a `login_events` row and an
+       * `auth.login` audit row. The client address is taken from the request
+       * headers server-side.
+       */
+      record_login: {
+        Args: { p_method?: string; p_user_agent?: string | null }
+        Returns: undefined
+      }
+      /** Writes an `auth.logout` audit row for the caller. */
+      record_logout: { Args: Record<string, never>; Returns: undefined }
+      /** System console overview. Super administrators only. */
+      platform_stats: { Args: Record<string, never>; Returns: Json }
       log_audit_event: {
         Args: {
           p_action: string

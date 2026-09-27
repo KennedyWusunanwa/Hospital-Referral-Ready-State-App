@@ -15,7 +15,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
-import { supabase } from '@/lib/supabase'
+import { humanizeSupabaseError, supabase } from '@/lib/supabase'
 import {
   DEFAULT_SCORING_CONFIG,
   type AuditAction,
@@ -69,8 +69,12 @@ export interface UpdateStaffInput {
   hospitalId: string | null
   changes: {
     role?: UserRole
+    /** System administrators may move an account between facilities. */
+    hospital_id?: string | null
     department_id?: string | null
     is_active?: boolean
+    full_name?: string
+    phone?: string | null
   }
 }
 
@@ -141,9 +145,80 @@ export function useUpsertHospital(): UseMutationResult<Hospital, Error, UpsertHo
   })
 }
 
+export const HOSPITAL_LOGO_BUCKET = 'hospital-logos'
+export const MAX_HOSPITAL_LOGO_BYTES = 1024 * 1024
+export const ACCEPTED_HOSPITAL_LOGO_TYPES = [
+  'image/png',
+  'image/svg+xml',
+  'image/jpeg',
+  'image/webp',
+]
+
+export interface UploadHospitalLogoInput {
+  hospitalId: string
+  file: File
+}
+
+/**
+ * Uploads under `<hospital_id>/`, which is the folder the storage policy lets a
+ * hospital administrator write to. The filename carries a timestamp because
+ * the bucket is CDN-cached: overwriting a fixed name would keep serving the
+ * previous logo.
+ */
+export function useUploadHospitalLogo(): UseMutationResult<string, Error, UploadHospitalLogoInput> {
+  return useMutation({
+    mutationFn: async ({ hospitalId, file }: UploadHospitalLogoInput) => {
+      if (!ACCEPTED_HOSPITAL_LOGO_TYPES.includes(file.type)) {
+        throw new Error('Use a PNG, SVG, JPEG or WebP image.')
+      }
+      if (file.size > MAX_HOSPITAL_LOGO_BYTES) {
+        throw new Error(
+          `That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. Keep the logo under 1 MB.`,
+        )
+      }
+      const extension = file.name.includes('.') ? file.name.split('.').pop() : 'png'
+      const path = `${hospitalId}/logo-${Date.now()}.${extension}`
+
+      const { error } = await supabase.storage
+        .from(HOSPITAL_LOGO_BUCKET)
+        .upload(path, file, { contentType: file.type, upsert: false, cacheControl: '31536000' })
+      if (error) {
+        if (/bucket not found/i.test(error.message)) {
+          throw new Error(
+            'The "hospital-logos" storage bucket does not exist yet. Run migration 0006, or create a public bucket named "hospital-logos" in the Supabase dashboard.',
+          )
+        }
+        throw new Error(humanizeSupabaseError(error))
+      }
+
+      const { data } = supabase.storage.from(HOSPITAL_LOGO_BUCKET).getPublicUrl(path)
+      return data.publicUrl
+    },
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Departments
 // ---------------------------------------------------------------------------
+
+/** Every active department on the network, for name lookups in network-wide tables. */
+export function useAllDepartments(
+  enabled = true,
+): UseQueryResult<Array<Pick<Department, 'id' | 'name' | 'hospital_id'>>> {
+  return useQuery({
+    queryKey: [...queryKeys.departments.all, 'names'],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, name, hospital_id')
+        .order('name')
+      if (error) throw error
+      return (data ?? []) as Array<Pick<Department, 'id' | 'name' | 'hospital_id'>>
+    },
+  })
+}
 
 /**
  * The readiness feature's `useDepartments` intentionally hides retired
@@ -182,7 +257,10 @@ export function useDepartmentHistoryCount(departmentId: string | null): UseQuery
   })
 }
 
-export type UpsertDepartmentInput = { id?: string | null; hospital_id: string } & TablesUpdate<'departments'>
+export type UpsertDepartmentInput = {
+  id?: string | null
+  hospital_id: string
+} & TablesUpdate<'departments'>
 
 export function useUpsertDepartment(): UseMutationResult<Department, Error, UpsertDepartmentInput> {
   const queryClient = useQueryClient()
@@ -455,4 +533,44 @@ export function useAuditLogs(filters: AuditLogFilters): UseQueryResult<AuditLogP
 export async function fetchAuditLogsForExport(filters: AuditLogFilters): Promise<AuditLogEntry[]> {
   const { rows } = await fetchAuditLogs(filters, AUDIT_EXPORT_LIMIT, 0)
   return rows
+}
+
+// ---------------------------------------------------------------------------
+// Global search
+// ---------------------------------------------------------------------------
+
+export type StaffSearchHit = Pick<
+  Profile,
+  'id' | 'full_name' | 'email' | 'role' | 'hospital_id' | 'is_active'
+>
+
+/**
+ * The command palette's people lookup. RLS already limits the rows to the
+ * caller's own hospital (or the network for a system administrator).
+ */
+export function useStaffSearch(
+  term: string,
+  enabled: boolean,
+  limit = 6,
+): UseQueryResult<StaffSearchHit[]> {
+  const needle = term
+    .replace(/[,()%*"']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return useQuery({
+    queryKey: ['admin', 'staff-search', needle, limit],
+    enabled: enabled && needle.length >= 2,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role, hospital_id, is_active')
+        .or(`full_name.ilike.%${needle}%,email.ilike.%${needle}%`)
+        .order('full_name')
+        .limit(limit)
+      if (error) throw error
+      return (data ?? []) as StaffSearchHit[]
+    },
+  })
 }

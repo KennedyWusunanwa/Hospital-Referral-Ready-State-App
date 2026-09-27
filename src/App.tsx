@@ -24,6 +24,7 @@ const ReportsPage = lazy(() => import('@/features/reports/ReportsPage'))
 const NotificationsPage = lazy(() => import('@/features/notifications/NotificationsPage'))
 
 const AdminPage = lazy(() => import('@/features/admin/AdminPage'))
+const ConsolePage = lazy(() => import('@/features/console/ConsolePage'))
 const NotFoundPage = lazy(() => import('@/features/misc/NotFoundPage'))
 
 function PageFallback() {
@@ -132,6 +133,14 @@ export default function App() {
             element={
               <RequireCapability capability="admin:hospital">
                 <AdminPage />
+              </RequireCapability>
+            }
+          />
+          <Route
+            path="console/*"
+            element={
+              <RequireCapability capability="admin:system">
+                <ConsolePage />
               </RequireCapability>
             }
           />

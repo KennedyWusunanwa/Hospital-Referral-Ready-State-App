@@ -51,7 +51,11 @@ async function logAudit(
 
 export interface UpdateAppSettingsInput {
   brand_color?: string
+  /** Logo for light surfaces. */
   logo_url?: string | null
+  /** Logo for dark surfaces. */
+  logo_dark_url?: string | null
+  logo_mode?: 'auto' | 'light' | 'dark'
   app_name?: string
   app_tagline?: string
   support_email?: string | null
@@ -94,9 +98,15 @@ export interface UploadLogoResult {
  * filename carries a timestamp because the bucket is CDN-cached: overwriting a
  * fixed name would keep serving the previous logo.
  */
-export function useUploadLogo(): UseMutationResult<UploadLogoResult, Error, File> {
+export interface UploadLogoInput {
+  file: File
+  /** Which surface the artwork is for; only used to name the file. */
+  variant?: 'light' | 'dark'
+}
+
+export function useUploadLogo(): UseMutationResult<UploadLogoResult, Error, UploadLogoInput> {
   return useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, variant = 'light' }: UploadLogoInput) => {
       if (!ACCEPTED_LOGO_TYPES.includes(file.type)) {
         throw new Error('Use a PNG, SVG, JPEG or WebP image.')
       }
@@ -107,7 +117,7 @@ export function useUploadLogo(): UseMutationResult<UploadLogoResult, Error, File
       }
 
       const extension = file.name.includes('.') ? file.name.split('.').pop() : 'png'
-      const path = `logo-${Date.now()}.${extension}`
+      const path = `logo-${variant}-${Date.now()}.${extension}`
 
       const { error } = await supabase.storage
         .from(LOGO_BUCKET)

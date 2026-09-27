@@ -203,6 +203,80 @@ export function useHospitalReadiness(
 }
 
 // ---------------------------------------------------------------------------
+// Network-wide readiness
+// ---------------------------------------------------------------------------
+// One fetch for every hospital's departments, so the directory can filter and
+// sort on readiness without a query per card, and a system administrator can
+// see the whole country on one board. RLS still applies: department rows are
+// readable by every signed-in user, submitter names only within one's own
+// hospital.
+
+interface RawNetworkReadiness {
+  rows: Array<Views<'department_readiness'>>
+  timezones: Record<string, string>
+}
+
+function networkReadinessQueryOptions(enabled: boolean) {
+  return {
+    queryKey: queryKeys.readiness.network,
+    enabled,
+    refetchInterval: READINESS_TICK_MS,
+    staleTime: 30_000,
+    queryFn: async (): Promise<RawNetworkReadiness> => {
+      const [departments, hospitals] = await Promise.all([
+        supabase.from('department_readiness').select('*').order('department_name'),
+        supabase.from('hospitals').select('id, timezone'),
+      ])
+      if (departments.error) fail(departments.error)
+      if (hospitals.error) fail(hospitals.error)
+      const timezones: Record<string, string> = {}
+      for (const hospital of hospitals.data ?? []) {
+        timezones[hospital.id] = hospital.timezone || DEFAULT_TIMEZONE
+      }
+      return { rows: departments.data ?? [], timezones }
+    },
+  }
+}
+
+/** Every department on the network, decorated with its traffic light. */
+export function useNetworkDepartmentReadiness(
+  enabled = true,
+): UseQueryResult<DepartmentReadiness[]> {
+  const now = useNowTick()
+  const select = useCallback(
+    (raw: RawNetworkReadiness) =>
+      raw.rows.map((row) => decorate(row, now, raw.timezones[row.hospital_id] ?? DEFAULT_TIMEZONE)),
+    [now],
+  )
+  return useQuery({ ...networkReadinessQueryOptions(enabled), select })
+}
+
+export type NetworkReadinessMap = Record<string, HospitalReadinessSummary>
+
+/** Per-hospital roll-ups keyed by hospital id. A hospital with no departments is absent. */
+export function useNetworkReadiness(enabled = true): UseQueryResult<NetworkReadinessMap> {
+  const now = useNowTick()
+  const select = useCallback(
+    (raw: RawNetworkReadiness) => {
+      const byHospital = new Map<string, DepartmentReadiness[]>()
+      for (const row of raw.rows) {
+        const timezone = raw.timezones[row.hospital_id] ?? DEFAULT_TIMEZONE
+        const list = byHospital.get(row.hospital_id) ?? []
+        list.push(decorate(row, now, timezone))
+        byHospital.set(row.hospital_id, list)
+      }
+      const map: NetworkReadinessMap = {}
+      for (const [hospitalId, rows] of byHospital) {
+        map[hospitalId] = summariseHospitalReadiness(rows, hospitalId)
+      }
+      return map
+    },
+    [now],
+  )
+  return useQuery({ ...networkReadinessQueryOptions(enabled), select })
+}
+
+// ---------------------------------------------------------------------------
 // Current resource state
 // ---------------------------------------------------------------------------
 
