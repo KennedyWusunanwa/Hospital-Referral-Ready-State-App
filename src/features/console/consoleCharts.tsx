@@ -79,7 +79,13 @@ export function LoginTrendChart({ data, height = 240 }: { data: DailyLogins[]; h
           labelFormatter={(label) => longDay(String(label))}
           formatter={(value, name) => [String(Number(value)), String(name)]}
         />
-        <Legend wrapperStyle={{ fontSize: 12, color: t.axis }} />
+        <Legend
+          verticalAlign="top"
+          align="right"
+          height={28}
+          iconSize={10}
+          wrapperStyle={{ fontSize: 12, color: t.axis, paddingBottom: 8 }}
+        />
         <Bar
           dataKey="logins"
           name="Sign-ins"
@@ -138,7 +144,13 @@ export function ReferralsDailyChart({
           labelFormatter={(label) => longDay(String(label))}
           formatter={(value, name) => [String(Number(value)), String(name)]}
         />
-        <Legend wrapperStyle={{ fontSize: 12, color: t.axis }} />
+        <Legend
+          verticalAlign="top"
+          align="right"
+          height={28}
+          iconSize={10}
+          wrapperStyle={{ fontSize: 12, color: t.axis, paddingBottom: 8 }}
+        />
         <Area
           type="monotone"
           dataKey="created"

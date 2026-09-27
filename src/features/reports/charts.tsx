@@ -249,7 +249,13 @@ export function ReferralTrendChart({
           labelFormatter={(label) => longDay(String(label))}
           formatter={(value, name) => [String(Number(value)), String(name)]}
         />
-        <Legend wrapperStyle={{ fontSize: 12, color: t.axis }} />
+        <Legend
+          verticalAlign="top"
+          align="right"
+          height={28}
+          iconSize={10}
+          wrapperStyle={{ fontSize: 12, color: t.axis, paddingBottom: 8 }}
+        />
         <Area
           type="monotone"
           dataKey="created"
@@ -561,7 +567,13 @@ export function ResponseTimeChart({
           {...tooltipProps(t)}
           formatter={(value, name) => [formatSeconds(Number(value) * 60), String(name)]}
         />
-        <Legend wrapperStyle={{ fontSize: 12, color: t.axis }} />
+        <Legend
+          verticalAlign="top"
+          align="right"
+          height={28}
+          iconSize={10}
+          wrapperStyle={{ fontSize: 12, color: t.axis, paddingBottom: 8 }}
+        />
         <Bar
           dataKey="avgResponseMinutes"
           name="Avg response"
