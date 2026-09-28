@@ -11,14 +11,14 @@
 --
 --   1. A sixth role, department_coordinator: a department-level account that
 --      may also raise referrals from its department (subject to 3).
---   2. Scope helpers: current_user_level(), accessible_department_ids(),
---      can_view_department(), can_manage_department(), can_view_referral(),
---      referral_policy_allows(), can_create_referral().
---   3. hospitals.referral_policy: which levels may initiate a referral.
+--   2. hospitals.referral_policy: which levels may initiate a referral.
 --      Default 'hospital_only', which is exactly how every hospital behaved
 --      before the setting existed.
---   4. referrals.origin_department_id: the department a referral was raised
+--   3. referrals.origin_department_id: the department a referral was raised
 --      from, so department-level visibility has something to key on.
+--   4. Scope helpers: current_user_level(), accessible_department_ids(),
+--      can_view_department(), can_manage_department(), can_view_referral(),
+--      referral_policy_allows(), can_create_referral().
 --   5. Row-level security re-scoped: departments, readiness_updates,
 --      referrals, referral_events, messages, receipts, profiles, invitations.
 --   6. RPCs re-scoped: submit_readiness (also fixes the "malformed array
@@ -85,10 +85,44 @@ as $$
 $$;
 
 -- -----------------------------------------------------------------------------
--- 2. Scope helpers
+-- 2. Referral initiation policy
+-- -----------------------------------------------------------------------------
+-- Added before the helpers in section 4, which read this column.
+
+alter table public.hospitals
+  add column if not exists referral_policy text not null default 'hospital_only';
+
+alter table public.hospitals drop constraint if exists hospitals_referral_policy_check;
+alter table public.hospitals add constraint hospitals_referral_policy_check check (
+  referral_policy in ('hospital_only', 'department_only', 'hospital_and_department')
+);
+
+comment on column public.hospitals.referral_policy is
+  'Which levels may initiate a referral from this hospital. hospital_only is the historical behaviour.';
+
+-- -----------------------------------------------------------------------------
+-- 3. Department context on a referral
+-- -----------------------------------------------------------------------------
+
+alter table public.referrals
+  add column if not exists origin_department_id uuid references public.departments (id) on delete set null;
+
+create index if not exists referrals_origin_department_idx
+  on public.referrals (origin_department_id);
+
+comment on column public.referrals.origin_department_id is
+  'The requester''s department when the referral was raised. Keys department-level visibility.';
+
+-- -----------------------------------------------------------------------------
+-- 4. Scope helpers
 -- -----------------------------------------------------------------------------
 -- All SECURITY DEFINER, all keyed on auth.uid() only, all pinned to the public
 -- schema -- the same discipline as the 0002 helpers they sit beside.
+--
+-- These come AFTER the new columns on purpose: a `language sql` function body is
+-- checked against the catalog when it is created, so referral_policy_allows()
+-- and can_view_referral() need hospitals.referral_policy and
+-- referrals.origin_department_id to exist already.
 
 create or replace function public.current_user_level()
 returns text
@@ -313,34 +347,6 @@ grant execute on function public.can_manage_department(uuid) to authenticated;
 grant execute on function public.referral_policy_allows(text, uuid) to authenticated;
 grant execute on function public.can_create_referral() to authenticated;
 grant execute on function public.can_view_referral(uuid) to authenticated;
-
--- -----------------------------------------------------------------------------
--- 3. Referral initiation policy
--- -----------------------------------------------------------------------------
-
-alter table public.hospitals
-  add column if not exists referral_policy text not null default 'hospital_only';
-
-alter table public.hospitals drop constraint if exists hospitals_referral_policy_check;
-alter table public.hospitals add constraint hospitals_referral_policy_check check (
-  referral_policy in ('hospital_only', 'department_only', 'hospital_and_department')
-);
-
-comment on column public.hospitals.referral_policy is
-  'Which levels may initiate a referral from this hospital. hospital_only is the historical behaviour.';
-
--- -----------------------------------------------------------------------------
--- 4. Department context on a referral
--- -----------------------------------------------------------------------------
-
-alter table public.referrals
-  add column if not exists origin_department_id uuid references public.departments (id) on delete set null;
-
-create index if not exists referrals_origin_department_idx
-  on public.referrals (origin_department_id);
-
-comment on column public.referrals.origin_department_id is
-  'The requester''s department when the referral was raised. Keys department-level visibility.';
 
 -- -----------------------------------------------------------------------------
 -- 5. Row-level security
