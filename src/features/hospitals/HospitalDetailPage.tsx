@@ -1,5 +1,15 @@
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Building2, Clock, MapPin, Pencil, Send, Stethoscope, Wind } from 'lucide-react'
+import {
+  ArrowLeft,
+  Building2,
+  Clock,
+  MapPin,
+  Pencil,
+  Send,
+  ShieldAlert,
+  Stethoscope,
+  Wind,
+} from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
 import { DetailPageSkeleton } from '@/components/ui/skeletons'
 import {
@@ -18,6 +28,7 @@ import { formatDistance, haversineKm, isValidLatLng } from '@/domain/geo'
 import { ReadinessBoard } from '@/features/readiness/ReadinessBoard'
 import { useHospitalReadiness, useHospitalResources } from '@/features/readiness/useReadiness'
 import { HOSPITAL_LEVEL_LABELS, READINESS_LABELS } from '@/lib/constants'
+import { canCreateReferral } from '@/lib/scope'
 import { cn, formatDateTime, relativeTime } from '@/lib/utils'
 import type { HospitalResources } from '@/lib/types'
 import { BloodStockTable } from './BloodStockTable'
@@ -85,7 +96,7 @@ function CapacityStats({ resources }: { resources: HospitalResources | null }) {
 
 export default function HospitalDetailPage() {
   const { hospitalId } = useParams<{ hospitalId: string }>()
-  const { hospital: ownHospital, role, can } = useAuth()
+  const { hospital: ownHospital, role, can, scope } = useAuth()
 
   const hospitalQuery = useHospital(hospitalId ?? null)
   const resourcesQuery = useHospitalResources(hospitalId ?? null)
@@ -179,7 +190,7 @@ export default function HospitalDetailPage() {
         }
         actions={
           <>
-            {!isOwn && can('referral:create') && (
+            {!isOwn && canCreateReferral(scope) && (
               <Link to="/referrals/new" className={cn(ACTION_LINK, ACTION_PRIMARY)}>
                 <Send className="h-4 w-4" aria-hidden />
                 Refer a patient here
@@ -309,7 +320,20 @@ export default function HospitalDetailPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Department readiness
         </h2>
-        <ReadinessBoard hospitalId={hospital.id} />
+        {scope.hospitalWide || isOwn ? (
+          <ReadinessBoard hospitalId={hospital.id} />
+        ) : (
+          <Card>
+            <CardBody className="flex items-start gap-3">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+              <p className="hint">
+                Department-by-department readiness for other facilities is shown to hospital-level
+                accounts. When a referral is raised, the ranking still uses this hospital&apos;s
+                live readiness.
+              </p>
+            </CardBody>
+          </Card>
+        )}
       </section>
     </div>
   )

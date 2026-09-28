@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Clock, Plus, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { useAuth, useCurrentHospitalId } from '@/auth/AuthProvider'
 import { Gate } from '@/auth/RequireAuth'
+import { canCreateReferral } from '@/lib/scope'
 import {
   Alert,
   Badge,
@@ -28,6 +29,7 @@ import { cn } from '@/lib/utils'
 import { ReadinessBoard } from '@/features/readiness/ReadinessBoard'
 import { useHospitalReadiness, useNowTick } from '@/features/readiness/useReadiness'
 import { DashboardStats } from './DashboardStats'
+import { DepartmentDashboard } from './DepartmentDashboard'
 import { NeedsAttention } from './NeedsAttention'
 import { NetworkOverview } from './NetworkOverview'
 import { ReadinessDuty } from './ReadinessDuty'
@@ -65,7 +67,7 @@ function NewReferralCta() {
 }
 
 export default function DashboardPage() {
-  const { profile, hospital, role, timezone, can } = useAuth()
+  const { profile, hospital, role, timezone, can, scope } = useAuth()
   const hospitalId = useCurrentHospitalId()
   const now = useNowTick()
   const readiness = useHospitalReadiness(hospitalId)
@@ -161,7 +163,22 @@ export default function DashboardPage() {
     )
   }
 
-  const showCta = can('referral:create')
+  if (scope.level === 'department') {
+    return (
+      <DepartmentDashboard
+        greeting={greeting}
+        roleLabel={roleLabel}
+        shiftChip={shiftChip}
+        hospital={hospital}
+        hospitalId={hospitalId}
+        scope={scope}
+        minutesLeft={minutesLeft}
+        now={now}
+      />
+    )
+  }
+
+  const showCta = canCreateReferral(scope)
   const showDuty = can('readiness:submit')
 
   return (
@@ -176,7 +193,7 @@ export default function DashboardPage() {
           {showDuty && (
             <ReadinessDuty
               hospitalId={hospitalId}
-              departmentId={profile?.department_id ?? null}
+              departmentIds={profile?.department_id ? [profile.department_id] : []}
               minutesLeft={minutesLeft}
               now={now}
             />

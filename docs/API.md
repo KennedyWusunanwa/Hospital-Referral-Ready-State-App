@@ -52,7 +52,7 @@ single query that feeds the ranking engine.
 | --- | --- |
 | **Purpose** | Assemble the candidate set for a referral decision |
 | **Volatility** | `stable` |
-| **May call** | Any authenticated user (in practice, anyone with `referral:create`) |
+| **May call** | `referral:create`, from the caller's own hospital, and only where the hospital's `referral_policy` admits the caller's level (`can_create_referral()`). Anyone else gets `42501` |
 
 **Arguments**
 
@@ -98,7 +98,7 @@ an audit row — all in one transaction, so the three can never disagree.
 | | |
 | --- | --- |
 | **Purpose** | File one department's readiness for the current shift |
-| **May call** | `readiness:submit` — `shift_in_charge`, `hospital_admin`, `super_admin` — **for a department at their own hospital only** |
+| **May call** | `readiness:submit` — `shift_in_charge` and `department_coordinator` **for their own department only**; `hospital_admin` for any department at their own hospital; `super_admin` anywhere. Enforced by `can_manage_department()`; a department outside scope gets `42501` |
 
 **Arguments**
 
@@ -145,7 +145,7 @@ Creates a referral and everything that must accompany it.
 | | |
 | --- | --- |
 | **Purpose** | Raise a referral to a chosen hospital |
-| **May call** | `referral:create` — `referral_coordinator`, `hospital_admin`, `super_admin` |
+| **May call** | `referral:create` — `referral_coordinator`, `hospital_admin`, `department_coordinator`, `super_admin` — **subject to the hospital's `referral_policy`** (`hospital_only` admits hospital-level roles, `department_only` department coordinators, `hospital_and_department` both; a super admin always). The requester's department is recorded as `origin_department_id` |
 
 **Arguments**
 

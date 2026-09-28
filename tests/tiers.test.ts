@@ -27,8 +27,17 @@ describe('access tiers', () => {
     }
   })
 
-  it('puts the shift in-charge alone at department level', () => {
-    expect(ROLES_BY_TIER.department).toEqual(['shift_in_charge'])
+  it('keeps department level to the two roles that are scoped to one department', () => {
+    expect(ROLES_BY_TIER.department).toEqual(['shift_in_charge', 'department_coordinator'])
+  })
+
+  it('lets a department coordinator refer but never respond or administer', () => {
+    const capabilities: readonly string[] = ROLE_CAPABILITIES.department_coordinator
+    expect(capabilities).toContain('referral:create')
+    expect(capabilities).toContain('readiness:submit')
+    expect(capabilities).not.toContain('referral:respond')
+    expect(capabilities).not.toContain('admin:hospital')
+    expect(capabilities).not.toContain('reports:view')
   })
 
   it('labels a role with its tier', () => {

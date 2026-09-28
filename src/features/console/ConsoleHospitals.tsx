@@ -74,6 +74,7 @@ function toPayload(values: HospitalFormValues) {
     logo_url: values.logo_url,
     is_active: values.is_active,
     accepts_referrals: values.accepts_referrals,
+    referral_policy: values.referral_policy,
   }
 }
 
@@ -190,65 +191,63 @@ export default function ConsoleHospitals() {
           </Button>
         </div>
         <FilterBarAdvanced>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Region">
-              {({ id }) => (
-                <Select
-                  id={id}
-                  value={state.region}
-                  onChange={(e) => update({ region: e.target.value })}
-                >
-                  <option value="">All regions</option>
-                  {regions.map((region) => (
-                    <option key={region} value={region}>
-                      {region}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Field label="Level">
-              {({ id }) => (
-                <Select
-                  id={id}
-                  value={state.level}
-                  onChange={(e) => update({ level: e.target.value })}
-                >
-                  <option value="">All levels</option>
-                  {HOSPITAL_LEVELS.map((level) => (
-                    <option key={level} value={level}>
-                      {HOSPITAL_LEVEL_LABELS[level]}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-            <Field label="Referrals">
-              {({ id }) => (
-                <Select
-                  id={id}
-                  value={state.accepting}
-                  onChange={(e) => update({ accepting: e.target.value })}
-                >
-                  <option value="">Accepting or not</option>
-                  <option value="yes">Accepting</option>
-                  <option value="no">On diversion</option>
-                </Select>
-              )}
-            </Field>
-            <div className="flex flex-wrap items-end gap-2">
-              {READINESS_STATUSES.map((status: ReadinessStatus) => (
-                <Chip
-                  key={status}
-                  active={state.readiness === status}
-                  onClick={() => update({ readiness: state.readiness === status ? '' : status })}
-                  tone={STATUS_TONE[status]}
-                >
-                  <StatusDot status={status} />
-                  {READINESS_LABELS[status]}
-                </Chip>
-              ))}
-            </div>
+          <Field label="Region">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.region}
+                onChange={(e) => update({ region: e.target.value })}
+              >
+                <option value="">All regions</option>
+                {regions.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Level">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.level}
+                onChange={(e) => update({ level: e.target.value })}
+              >
+                <option value="">All levels</option>
+                {HOSPITAL_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {HOSPITAL_LEVEL_LABELS[level]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Referrals">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={state.accepting}
+                onChange={(e) => update({ accepting: e.target.value })}
+              >
+                <option value="">Accepting or not</option>
+                <option value="yes">Accepting</option>
+                <option value="no">On diversion</option>
+              </Select>
+            )}
+          </Field>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+            {READINESS_STATUSES.map((status: ReadinessStatus) => (
+              <Chip
+                key={status}
+                active={state.readiness === status}
+                onClick={() => update({ readiness: state.readiness === status ? '' : status })}
+                tone={STATUS_TONE[status]}
+              >
+                <StatusDot status={status} />
+                {READINESS_LABELS[status]}
+              </Chip>
+            ))}
           </div>
         </FilterBarAdvanced>
       </FilterBar>

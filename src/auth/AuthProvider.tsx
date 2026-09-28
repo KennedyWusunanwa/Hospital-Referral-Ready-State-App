@@ -12,6 +12,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase, humanizeSupabaseError } from '@/lib/supabase'
 import { DEFAULT_TIMEZONE, type Capability, type LoginMethod, type UserRole } from '@/lib/constants'
 import type { Hospital, Profile } from '@/lib/types'
+import { buildScope, type UserScope } from '@/lib/scope'
 import { can as hasCapability, sleep } from '@/lib/utils'
 
 export interface AuthState {
@@ -35,6 +36,8 @@ export interface AuthContextValue extends AuthState {
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   can: (capability: Capability) => boolean
+  /** Where this account may act: level, hospital, departments, referral policy. */
+  scope: UserScope
   /** The hospital's IANA timezone, or the deployment default. */
   timezone: string
 }
@@ -57,7 +60,7 @@ const PROFILE_COLUMNS =
   'id, full_name, email, phone, role, hospital_id, department_id, is_active, must_change_password, last_login_at, created_at, updated_at'
 
 const HOSPITAL_COLUMNS =
-  'id, name, code, level, address, city, region, country, latitude, longitude, phone, emergency_phone, email, timezone, is_active, accepts_referrals, notes, logo_url, created_at, updated_at'
+  'id, name, code, level, address, city, region, country, latitude, longitude, phone, emergency_phone, email, timezone, is_active, accepts_referrals, notes, logo_url, referral_policy, created_at, updated_at'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -268,9 +271,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadProfile(data.session)
   }, [loadProfile])
 
+  const scope = useMemo(
+    () =>
+      buildScope({
+        role: state.role,
+        hospitalId: state.profile?.hospital_id ?? null,
+        departmentId: state.profile?.department_id ?? null,
+        referralPolicy: state.hospital?.referral_policy ?? null,
+      }),
+    [
+      state.role,
+      state.profile?.hospital_id,
+      state.profile?.department_id,
+      state.hospital?.referral_policy,
+    ],
+  )
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
+      scope,
       signInWithPassword,
       signInWithOtp,
       verifyOtp,
@@ -283,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      scope,
       signInWithPassword,
       signInWithOtp,
       verifyOtp,
@@ -305,4 +326,9 @@ export function useAuth(): AuthContextValue {
 /** Convenience for the very common "who am I and where do I work" read. */
 export function useCurrentHospitalId(): string | null {
   return useAuth().profile?.hospital_id ?? null
+}
+
+/** The organisational scope of the signed-in account. */
+export function useScope(): UserScope {
+  return useAuth().scope
 }

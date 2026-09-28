@@ -22,6 +22,7 @@ import type { Tables } from '@/lib/database.types'
 import { queryKeys } from '@/lib/queryKeys'
 import { humanizeSupabaseError, supabase } from '@/lib/supabase'
 import type { AppNotification } from '@/lib/types'
+import { playAlertChime } from '@/lib/alertSound'
 
 type NotificationRow = Tables<'notifications'>
 
@@ -216,13 +217,30 @@ function subscribeToInserts(userId: string, listener: NotificationListener): () 
 
 function raiseToast(notification: AppNotification, navigate: NavigateFunction): void {
   const path = internalLink(notification.link)
+  const severity = notificationSeverity(notification.severity)
+  const incoming = notification.type === 'referral_incoming'
+
   const options: ExternalToast = {
+    id: notification.id,
     description: notification.body ?? undefined,
-    action: path ? { label: 'View', onClick: () => navigate(path) } : undefined,
+    action: path
+      ? { label: incoming ? 'Open referral' : 'View', onClick: () => navigate(path) }
+      : undefined,
+    // An incoming referral is a request for a decision: it stays until the
+    // person opens it or dismisses it, however long that takes.
+    duration: incoming ? Infinity : severity === 'critical' ? 12_000 : undefined,
+    cancel: incoming ? { label: 'Dismiss', onClick: () => undefined } : undefined,
   }
 
-  switch (notificationSeverity(notification.severity)) {
+  if (incoming) {
+    playAlertChime(severity === 'critical' ? 'critical' : 'incoming')
+    toast.error(notification.title, options)
+    return
+  }
+
+  switch (severity) {
     case 'critical':
+      playAlertChime('critical')
       toast.error(notification.title, options)
       break
     case 'warning':

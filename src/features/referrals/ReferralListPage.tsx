@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Gate } from '@/auth/RequireAuth'
+import { Gate, ScopeGate } from '@/auth/RequireAuth'
 import { ListSkeleton } from '@/components/ui/skeletons'
 import { useAuth, useCurrentHospitalId } from '@/auth/AuthProvider'
 import {
@@ -36,6 +36,7 @@ import {
 } from '@/lib/constants'
 import type { ReferralStatus, UrgencyLevel } from '@/lib/constants'
 import { humanizeSupabaseError, supabase } from '@/lib/supabase'
+import { canCreateReferral } from '@/lib/scope'
 import type { ReferralWithRelations } from '@/lib/types'
 import { useUrlState } from '@/lib/useUrlState'
 import { cn, downloadCsv, formatDateTime, isReferralOverdue, toCsv } from '@/lib/utils'
@@ -333,14 +334,14 @@ export default function ReferralListPage() {
                 Export CSV
               </Button>
             </Gate>
-            <Gate capability="referral:create">
+            <ScopeGate allow={canCreateReferral}>
               <Link to="/referrals/new">
                 <Button size="sm">
                   <Plus className="h-4 w-4" aria-hidden />
                   New referral
                 </Button>
               </Link>
-            </Gate>
+            </ScopeGate>
           </>
         }
       />
@@ -538,11 +539,11 @@ export default function ReferralListPage() {
                 Clear filters
               </Button>
             ) : (
-              <Gate capability="referral:create">
+              <ScopeGate allow={canCreateReferral}>
                 <Link to="/referrals/new">
                   <Button size="sm">New referral</Button>
                 </Link>
-              </Gate>
+              </ScopeGate>
             )
           }
         />

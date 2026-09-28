@@ -51,6 +51,7 @@ import {
 import { formatDistance, formatDuration } from '@/domain/geo'
 import { scoreBand, type ScoreSnapshot } from '@/domain/scoring'
 import { humanizeSupabaseError } from '@/lib/supabase'
+import { canCreateReferral } from '@/lib/scope'
 import type { Json, ReferralWithRelations, ResourceScoreDetail } from '@/lib/types'
 import { cn, formatDateTime, formatPercent, telHref } from '@/lib/utils'
 import { useReferral, useUpdateReferralStatus } from '@/features/referrals/useReferrals'
@@ -58,6 +59,7 @@ import { ReferralStatusBadge, UrgencyBadge } from '@/features/referrals/Referral
 import { CallLink } from '@/features/hospitals/HospitalContactLinks'
 import { ReferralTimeline } from '@/features/referrals/ReferralTimeline'
 import { MessageThread } from '@/features/messaging/MessageThread'
+import { AttachmentsCard } from './AttachmentsCard'
 
 /** Which side of the transfer the signed-in user is on. */
 type Side = 'requesting' | 'receiving' | 'observer'
@@ -87,7 +89,7 @@ export default function ReferralDetailPage() {
   const params = useParams<{ referralId: string }>()
   const referralId = params.referralId ?? null
   const navigate = useNavigate()
-  const { profile, can, timezone } = useAuth()
+  const { profile, can, timezone, scope } = useAuth()
   const { data: referral, isLoading, error, refetch } = useReferral(referralId)
   const updateStatus = useUpdateReferralStatus()
 
@@ -224,12 +226,30 @@ export default function ReferralDetailPage() {
 
       <DirectionCard referral={referral} side={side} />
 
-      {referral.status === 'pending' && <AwaitingResponse requestedAt={referral.requested_at} />}
+      {referral.status === 'pending' && (
+        <AwaitingResponse
+          requestedAt={referral.requested_at}
+          phone={
+            side === 'receiving'
+              ? (referral.requesting_hospital?.emergency_phone ??
+                referral.requesting_hospital?.phone ??
+                null)
+              : (referral.receiving_hospital?.emergency_phone ??
+                referral.receiving_hospital?.phone ??
+                null)
+          }
+          facilityName={
+            side === 'receiving'
+              ? (referral.requesting_hospital?.name ?? null)
+              : (referral.receiving_hospital?.name ?? null)
+          }
+        />
+      )}
 
       {referral.status === 'declined' && (
         <Alert tone="danger" title="Declined by the receiving facility">
           {referral.decline_reason && <p>{referral.decline_reason}</p>}
-          {side === 'requesting' && can('referral:create') && (
+          {side === 'requesting' && canCreateReferral(scope) && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={referElsewhere}>
                 <RefreshCw className="h-4 w-4" aria-hidden />
@@ -295,7 +315,7 @@ export default function ReferralDetailPage() {
             )}
 
             {actions.includes('cancel') && (
-              <Button variant="outline" onClick={() => setModal('cancel')}>
+              <Button variant="danger" onClick={() => setModal('cancel')}>
                 <Ban className="h-4 w-4" aria-hidden />
                 Cancel referral
               </Button>
@@ -307,6 +327,7 @@ export default function ReferralDetailPage() {
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
           <CaseDetailsCard referral={referral} timezone={timezone} />
+          <AttachmentsCard referralId={referralId} status={referral.status} />
           <ContactCard referral={referral} side={side} />
           <ScoreSnapshotCard
             snapshot={referral.score_snapshot}
@@ -525,7 +546,16 @@ function HospitalBlock({
 }
 
 /** Live "awaiting response" clock, escalating past the response target. */
-function AwaitingResponse({ requestedAt }: { requestedAt: string }) {
+function AwaitingResponse({
+  requestedAt,
+  phone,
+  facilityName,
+}: {
+  requestedAt: string
+  /** The other facility's emergency line, offered as a one-tap call once the target is missed. */
+  phone: string | null
+  facilityName: string | null
+}) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -542,14 +572,24 @@ function AwaitingResponse({ requestedAt }: { requestedAt: string }) {
       tone={severe ? 'danger' : breached ? 'warning' : 'info'}
       title={`Awaiting response for ${minutes} min`}
     >
-      <p className="flex items-center gap-1.5">
-        {breached && <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />}
-        {severe
-          ? `Well past the ${REFERRAL_RESPONSE_TARGET_MINUTES} minute target. Call the receiving facility now.`
-          : breached
-            ? `Past the ${REFERRAL_RESPONSE_TARGET_MINUTES} minute target. Consider calling or picking the next hospital.`
-            : `Target response time is ${REFERRAL_RESPONSE_TARGET_MINUTES} minutes.`}
-      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="flex items-center gap-1.5">
+          {breached && <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />}
+          {severe
+            ? `Well past the ${REFERRAL_RESPONSE_TARGET_MINUTES} minute target. Call ${facilityName ?? 'the other facility'} now.`
+            : breached
+              ? `Past the ${REFERRAL_RESPONSE_TARGET_MINUTES} minute target. Consider calling or picking the next hospital.`
+              : `Target response time is ${REFERRAL_RESPONSE_TARGET_MINUTES} minutes.`}
+        </p>
+        {breached && phone && (
+          <CallLink
+            phone={phone}
+            emergency
+            label={`Call now ${phone}`}
+            className="h-10 shrink-0 px-4 text-sm"
+          />
+        )}
+      </div>
     </Alert>
   )
 }
@@ -581,7 +621,11 @@ function CaseDetailsCard({
           <DetailItem
             label="Requested by"
             value={referral.requested_by_profile?.full_name ?? 'Unknown'}
-            sub={formatDateTime(referral.requested_at, timezone)}
+            sub={
+              referral.origin_department
+                ? `${referral.origin_department.name} - ${formatDateTime(referral.requested_at, timezone)}`
+                : formatDateTime(referral.requested_at, timezone)
+            }
           />
           {referral.responded_at && (
             <DetailItem

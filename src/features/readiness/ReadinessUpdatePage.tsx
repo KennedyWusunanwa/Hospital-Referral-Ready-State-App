@@ -12,12 +12,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useController, useForm, type Control } from 'react-hook-form'
 import { toast } from 'sonner'
-import { ArrowLeft, CheckCircle2, History, Save } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Save } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
+import { NotAllowedCard } from '@/auth/RequireAuth'
+import { canSubmitReadinessFor } from '@/lib/scope'
 import { FormSkeleton } from '@/components/ui/skeletons'
 import {
   Alert,
-  Badge,
   Button,
   Card,
   CardBody,
@@ -27,7 +28,6 @@ import {
   ErrorBlock,
   Field,
   Input,
-  LoadingBlock,
   Modal,
   PageHeader,
   Textarea,
@@ -67,9 +67,9 @@ import {
   useCurrentShiftUpdate,
   useDepartment,
   useHospitalResources,
-  useReadinessHistory,
   useSubmitReadiness,
 } from './useReadiness'
+import { RecentSubmissions } from './RecentSubmissions'
 
 const DRAFT_DEBOUNCE_MS = 800
 
@@ -566,60 +566,21 @@ function ReadinessForm({
 }
 
 // ---------------------------------------------------------------------------
-// Recent submissions
-// ---------------------------------------------------------------------------
-
-function RecentSubmissions({ departmentId }: { departmentId: string }) {
-  const { timezone } = useAuth()
-  const query = useReadinessHistory(departmentId, 7)
-
-  return (
-    <Card>
-      <CardHeader title="Recent submissions" description="The last seven days." />
-      {query.isPending ? (
-        <LoadingBlock label="Loading submissions" rows={3} />
-      ) : query.isError ? (
-        <CardBody>
-          <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
-        </CardBody>
-      ) : (query.data ?? []).length === 0 ? (
-        <EmptyState
-          icon={<History className="h-8 w-8" />}
-          title="No submissions yet"
-          description="This department has not reported in the last seven days."
-        />
-      ) : (
-        <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-          {(query.data ?? []).map((update) => (
-            <li key={update.id} className="px-5 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                  {shiftLabel({ shiftDate: update.shift_date, shiftType: update.shift_type })}
-                </span>
-                <Badge tone="neutral">{formatDateTime(update.submitted_at, timezone)}</Badge>
-              </div>
-              {update.notes && (
-                <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{update.notes}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default function ReadinessUpdatePage() {
   const { departmentId } = useParams<{ departmentId: string }>()
   const navigate = useNavigate()
+  const { scope } = useAuth()
 
   const departmentQuery = useDepartment(departmentId ?? null)
   const department = departmentQuery.data ?? null
   const hospitalId = department?.hospital_id ?? null
+  // The route guard checked the department id; now that the row is here, the
+  // hospital is checked too, so a hospital-level account cannot file for
+  // another facility's unit by guessing an address.
+  const allowed = department ? canSubmitReadinessFor(scope, department) : true
 
   const resourcesQuery = useHospitalResources(hospitalId)
   const bloodQuery = useBloodStock(hospitalId)
@@ -639,12 +600,20 @@ export default function ReadinessUpdatePage() {
         <EmptyState
           icon={<CheckCircle2 className="h-8 w-8" />}
           title="Department not found"
-          description="This department may have been removed, or it belongs to another hospital."
+          description="This department may have been removed, or it is outside what your account can see."
           action={
             <Button variant="outline" onClick={() => navigate('/readiness')}>
               Back to the board
             </Button>
           }
+        />
+      )
+    }
+    if (!allowed) {
+      return (
+        <NotAllowedCard
+          title="Not your department"
+          message="Readiness for this department is filed by its own staff or by its hospital's administrators."
         />
       )
     }
@@ -687,7 +656,7 @@ export default function ReadinessUpdatePage() {
 
       {body()}
 
-      {departmentId && <RecentSubmissions departmentId={departmentId} />}
+      {departmentId && allowed && <RecentSubmissions departmentId={departmentId} />}
     </div>
   )
 }

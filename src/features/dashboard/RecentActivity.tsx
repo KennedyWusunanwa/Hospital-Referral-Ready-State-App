@@ -50,19 +50,20 @@ function Column({
         {referrals.length === 0 ? (
           <Card>
             <EmptyState
-              icon={direction === 'incoming' ? <Inbox className="h-7 w-7" /> : <Send className="h-7 w-7" />}
+              icon={
+                direction === 'incoming' ? (
+                  <Inbox className="h-7 w-7" />
+                ) : (
+                  <Send className="h-7 w-7" />
+                )
+              }
               title={emptyTitle}
               description={emptyDescription}
             />
           </Card>
         ) : (
           referrals.map((referral) => (
-            <ReferralCard
-              key={referral.id}
-              referral={referral}
-              direction={direction}
-              now={now}
-            />
+            <ReferralCard key={referral.id} referral={referral} direction={direction} now={now} />
           ))
         )}
       </div>
@@ -73,9 +74,14 @@ function Column({
 export interface RecentActivityProps {
   hospitalId: string | null
   now: Date
+  /**
+   * A department-level account only ever sees referrals raised from its own
+   * department, so the incoming column would always be empty for it.
+   */
+  variant?: 'hospital' | 'department'
 }
 
-export function RecentActivity({ hospitalId, now }: RecentActivityProps) {
+export function RecentActivity({ hospitalId, now, variant = 'hospital' }: RecentActivityProps) {
   // Matches the referral list page's unfiltered query, so navigating there is
   // instant rather than a second round trip.
   const query = useReferrals({ hospitalId, direction: 'all' })
@@ -102,6 +108,20 @@ export function RecentActivity({ hospitalId, now }: RecentActivityProps) {
 
   if (query.isError) {
     return <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
+  }
+
+  if (variant === 'department') {
+    return (
+      <Column
+        title="Referrals from your department"
+        icon={<ArrowUpRight className="h-4 w-4" aria-hidden />}
+        direction="outgoing"
+        referrals={outgoing}
+        emptyTitle="No referrals from your department yet"
+        emptyDescription="Referrals raised from your department will be tracked here from request to completion."
+        now={now}
+      />
+    )
   }
 
   return (

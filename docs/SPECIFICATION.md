@@ -107,17 +107,21 @@ moved on. Reports aggregate these into acceptance rates, response times and comp
 
 ## 2. User roles
 
-Five roles ship in this build. `super_admin` and `viewer` are additions to the three named in the
-project plan: the first so the system can be administered across hospitals without granting clinical
-rights, the second so managers and observers can be given dashboards without any ability to act.
+Six roles ship in this build, at three levels. `super_admin` and `viewer` are additions to the
+three named in the project plan: the first so the system can be administered across hospitals
+without granting clinical rights, the second so managers and observers can be given dashboards
+without any ability to act. `department_coordinator` was added with department scoping
+(`0008_department_scope.sql`) so a unit can be given the right to refer without being given the
+whole hospital.
 
-| Role | Key | Intended holder |
-| --- | --- | --- |
-| System Administrator | `super_admin` | The organisation running the network. Full cross-hospital access |
-| Hospital Administrator | `hospital_admin` | Runs one hospital: departments, staff, compliance, reports |
-| Shift In-Charge | `shift_in_charge` | Files the departmental readiness update each shift |
-| Referral Coordinator | `referral_coordinator` | Raises referrals and answers incoming ones |
-| Viewer | `viewer` | Read-only dashboards and reports for their hospital |
+| Role | Key | Level | Intended holder |
+| --- | --- | --- | --- |
+| System Administrator | `super_admin` | System | The organisation running the network. Full cross-hospital access |
+| Hospital Administrator | `hospital_admin` | Hospital | Runs one hospital: departments, staff, compliance, reports |
+| Referral Coordinator | `referral_coordinator` | Hospital | Raises referrals and answers incoming ones |
+| Viewer | `viewer` | Hospital | Read-only dashboards and reports for their hospital |
+| Shift In-Charge | `shift_in_charge` | Department | Files their own department's readiness update each shift |
+| Department Coordinator | `department_coordinator` | Department | Runs one department: files its readiness and, where the hospital's referral policy allows, raises referrals from it |
 
 ### 2.1 Capability matrix
 
@@ -125,19 +129,22 @@ Capabilities are declared once in `ROLE_CAPABILITIES` (`src/lib/constants.ts`) a
 database by `public.has_capability(text)` (`0002_rls.sql`). The UI matrix gates *affordances*; the
 database is the boundary that actually holds.
 
-| Capability | super_admin | hospital_admin | shift_in_charge | referral_coordinator | viewer |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| `readiness:view` — see readiness boards | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `readiness:submit` — file a shift update | ✅ | ✅ | ✅ | — | — |
-| `referral:view` — see referrals for their hospital | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `referral:create` — raise a referral | ✅ | ✅ | — | ✅ | — |
-| `referral:respond` — accept / decline / progress | ✅ | ✅ | — | ✅ | — |
-| `messaging:use` — post in a referral thread | ✅ | ✅ | ✅ | ✅ | — |
-| `reports:view` — reports for their hospital | ✅ | ✅ | — | ✅ | ✅ |
-| `reports:view_all` — reports across all hospitals | ✅ | — | — | — | — |
-| `admin:hospital` — hospital, departments, staff | ✅ | ✅ | — | — | — |
-| `admin:system` — emergency catalogue, scoring config | ✅ | — | — | — | — |
-| `audit:view` — read the audit log | ✅ | ✅ | — | — | — |
+| Capability | super_admin | hospital_admin | referral_coordinator | viewer | department_coordinator | shift_in_charge |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `readiness:view` — see readiness boards | ✅ | ✅ | ✅ | ✅ | ✅ own dept | ✅ own dept |
+| `readiness:submit` — file a shift update | ✅ | ✅ | — | — | ✅ own dept | ✅ own dept |
+| `referral:view` — see referrals for their hospital | ✅ | ✅ | ✅ | ✅ | ✅ own dept's | ✅ own dept's |
+| `referral:create` — raise a referral | ✅ | ✅ policy | ✅ policy | — | ✅ policy | — |
+| `referral:respond` — accept / decline / progress | ✅ | ✅ | ✅ | — | — | — |
+| `messaging:use` — post in a referral thread, attach files | ✅ | ✅ | ✅ | — | ✅ | ✅ |
+| `reports:view` — reports for their hospital | ✅ | ✅ | ✅ | ✅ | — | — |
+| `reports:view_all` — reports across all hospitals | ✅ | — | — | — | — | — |
+| `admin:hospital` — hospital, departments, staff | ✅ | ✅ | — | — | — | — |
+| `admin:system` — emergency catalogue, scoring config | ✅ | — | — | — | — | — |
+| `audit:view` — read the audit log | ✅ | ✅ | — | — | — | — |
+
+"policy" means the capability is further gated by the hospital's `referral_policy`
+(section 2.3); "own dept" means the capability reaches only the departments assigned to the account.
 
 ### 2.2 Scope, not just capability
 
@@ -147,18 +154,47 @@ own hospital by RLS. A `hospital_admin` at Hospital A holds `admin:hospital`, bu
 `hospital_id = current_user_hospital()`, so that capability simply does not reach Hospital B's rows.
 Referral rows are visible only where the user's hospital is the requesting or the receiving party.
 
+**Department scope** (`0008_department_scope.sql`) adds a third question below hospital scope. The
+helper `accessible_department_ids()` returns `NULL` (unrestricted) for system- and hospital-level
+roles and the account's own department(s) for department-level roles -- an empty array when a
+department-level account has no department, which fails every check closed. `can_view_department()`
+gates `departments` and `readiness_updates` (and therefore the `department_readiness` view),
+`can_manage_department()` gates `submit_readiness()`, and `can_view_referral()` gates referrals,
+their events, messages, receipts and attachments: a department-level account sees the referrals
+raised from its department (`referrals.origin_department_id`) or by itself, and nothing else. The
+profile guard treats `department_id` as privileged for department-level roles, requires it to be
+set, and requires it to belong to the account's hospital. The same rules are mirrored in
+`src/lib/scope.ts` so the interface can hide what the database will refuse.
+
 Two guarantees are worth calling out because they are enforced structurally rather than by
 convention:
 
 - **Nobody can promote themselves.** `profiles` may be updated by the owner, but a `BEFORE UPDATE`
-  trigger (`guard_profile_privileges`) rejects any change to `role`, `hospital_id` or `is_active`
-  unless the caller is a `super_admin`, or a `hospital_admin` moving a user within their own
-  hospital to a non-super-admin role. A `WITH CHECK` clause cannot see the old row, so this check
-  has to be a trigger.
+  trigger (`guard_profile_privileges`) rejects any change to `role`, `hospital_id`, `is_active` or
+  (for department-level roles) `department_id` unless the caller is a `super_admin`, or a
+  `hospital_admin` moving a user within their own hospital to a non-super-admin role. A `WITH CHECK`
+  clause cannot see the old row, so this check has to be a trigger.
 - **Deactivated accounts are locked out immediately.** `current_user_role()` and
   `current_user_hospital()` both filter on `is_active`, so a deactivated user's live JWT resolves to
   no role and no hospital; every scoped policy then fails closed. The client also signs them out on
   next profile load.
+
+### 2.3 Referral initiation policy
+
+`hospitals.referral_policy` decides which *levels* may raise a referral from a hospital, on top of
+the role capability:
+
+| Policy | Who may raise a referral | Notes |
+| --- | --- | --- |
+| `hospital_only` (default) | Hospital Administrator, Referral Coordinator | Exactly the pre-0008 behaviour. Department accounts follow referrals; they do not raise them |
+| `department_only` | Department Coordinator, from their own department | Hospital-level roles keep oversight and answer incoming requests but lose the New referral button |
+| `hospital_and_department` | Both of the above | |
+
+A System Administrator may always refer. A role without `referral:create` (Shift In-Charge, Viewer)
+never refers, whatever the policy. The rule is evaluated by `can_create_referral()` in
+`create_referral()` and `get_referral_candidates()`, and by `canCreateReferral()` in
+`src/lib/scope.ts` for every button, route and palette entry that leads to the wizard. Every
+referral records `origin_department_id`, the requester's department at the time.
 
 ---
 

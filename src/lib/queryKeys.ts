@@ -45,6 +45,7 @@ export const queryKeys = {
     list: (filters?: Record<string, unknown>) => ['referrals', 'list', filters ?? {}] as const,
     detail: (id: string) => ['referrals', 'detail', id] as const,
     events: (id: string) => ['referrals', 'events', id] as const,
+    attachments: (id: string) => ['referrals', 'attachments', id] as const,
     candidates: (params: Record<string, unknown>) => ['referrals', 'candidates', params] as const,
     inbox: (hospitalId: string) => ['referrals', 'inbox', hospitalId] as const,
     outbox: (hospitalId: string) => ['referrals', 'outbox', hospitalId] as const,

@@ -17,6 +17,7 @@ that one cannot see the other.
 | `SA` | `super_admin` | none | Cross-network administrator |
 | `A-ADMIN` | `hospital_admin` | Hospital A | |
 | `A-SHIFT` | `shift_in_charge` | Hospital A | Assigned to A's ICU department |
+| `A-DEPTCO` | `department_coordinator` | Hospital A | Assigned to A's Maternity department |
 | `A-COORD` | `referral_coordinator` | Hospital A | |
 | `A-VIEW` | `viewer` | Hospital A | |
 | `B-COORD` | `referral_coordinator` | Hospital B | |
@@ -179,6 +180,36 @@ developer laptop over office wifi. Targets are from [SPECIFICATION.md](SPECIFICA
 | AT-62 | Wide content scrolls without breaking the page | Reports and referral list on a 375 px viewport | 1. Open each. 2. Attempt to scroll the page sideways | Wide tables scroll **inside their own container**; the page body itself never scrolls horizontally | |
 | AT-63 | Keyboard and screen reader | Desktop, keyboard only, plus NVDA or VoiceOver | 1. Tab through login, the readiness form and the referral wizard. 2. Open and close a modal with the keyboard | Focus order is logical and the focus ring is always visible; every input announces its label, hint and error; icon-only buttons announce a name; modals trap focus and close on Escape | |
 | AT-64 | Traffic light is not conveyed by colour alone | Any readiness board; a colour-blindness simulator or greyscale mode | 1. View the board in greyscale | Every status is still unambiguous from its text label ("Current" / "Overdue" / "Stale") and its position. Dark mode is checked at the same time and every surface remains legible | |
+
+---
+
+## O. Department scope and referral policy
+
+Added with `0008_department_scope.sql`. Hospital A needs at least three departments (ICU, Theatre,
+Maternity). "Console" below means the browser developer console with the app's Supabase client,
+used to prove that the database, not the interface, refuses a call.
+
+| ID | Title | Preconditions | Steps | Expected result | Result |
+| --- | --- | --- | --- | --- | :---: |
+| DS-01 | Department user sees only their department (scenario A) | `A-SHIFT` assigned to ICU | 1. Sign in as `A-SHIFT`. 2. Open Dashboard, then Readiness | The dashboard names ICU and shows *Your shift update*, four department tiles and ICU's recent submissions; no hospital tiles, no list of other departments. Readiness shows the ICU view (section 6.5), not the board | |
+| DS-02 | Direct address to another department (scenario G) | `A-SHIFT`; Theatre's department id known | 1. Signed in as `A-SHIFT`, open `/readiness/<theatre id>` | A *Not your department* card. No form, no history | |
+| DS-03 | Other department's rows are not returned | `A-SHIFT` | 1. Console: `supabase.from('department_readiness').select('*')` and `supabase.from('readiness_updates').select('*')` | Only ICU rows come back, whatever filter is sent | |
+| DS-04 | RPC for another department refused (scenario H) | `A-SHIFT` | 1. Console: `supabase.rpc('submit_readiness', { p_department_id: '<theatre id>', p_payload: { resources: {} } })` | Error `42501` "You can only submit readiness for your own department." Nothing written | |
+| DS-05 | Own department submits and lands back on own view | `A-SHIFT` | 1. Submit ICU's readiness from the dashboard | Success toast; back on Readiness showing ICU green; the submission appears under Recent submissions | |
+| DS-06 | Hospital admin sees and submits for every department (scenario B) | `A-ADMIN` | 1. Open Readiness. 2. Open `/readiness/<theatre id>` and submit | Board lists all of A's departments; Theatre's form opens and saves | |
+| DS-07 | Hospital admin cannot file for another hospital | `A-ADMIN`; a Hospital B department id | 1. Open `/readiness/<B department id>` | *Not your department* card; the RPC, if forced, returns `42501` | |
+| DS-08 | Super admin unrestricted (scenario C) | `SA` | 1. Open `/readiness` (network board). 2. Open any department's form and submit | Every hospital shown; any department can be filed | |
+| DS-09 | Policy `hospital_only` (scenario D, the default) | Hospital A policy = *Hospital only*; `A-DEPTCO` | 1. As `A-COORD`, confirm *New referral* is offered. 2. As `A-DEPTCO`, open Dashboard, Referrals and search for "new referral"; then open `/referrals/new` | Coordinator sees the button. Department coordinator sees no button anywhere, the palette omits the page, and the address shows *Referrals are not raised from this account* with the policy explanation | |
+| DS-10 | Policy `department_only` (scenario E) | `A-ADMIN` sets *Departments only* under Administration → Hospital | 1. As `A-COORD`, open Referrals and `/referrals/new`. 2. As `A-DEPTCO`, raise a referral to Hospital B | Coordinator loses the button and the page; console `create_referral` returns `42501`. Department coordinator raises the referral; the referral page shows *Requested by … Maternity* | |
+| DS-11 | Policy `hospital_and_department` (scenario F) | `A-ADMIN` sets *Hospital and departments* | 1. As `A-COORD` and as `A-DEPTCO`, open `/referrals/new` | Both reach the wizard and can rank hospitals | |
+| DS-12 | Shift In-Charge never refers | Any policy | 1. As `A-SHIFT`, open `/referrals/new`; console `create_referral` | Refusal card; RPC `42501` "Your role cannot raise referrals." | |
+| DS-13 | Department referral visibility | Referral R1 raised by `A-DEPTCO` (Maternity); R2 raised by `A-COORD` | 1. As `A-DEPTCO`, open Referrals. 2. As `A-SHIFT` (ICU), open Referrals and `/referrals/<R1 id>` | `A-DEPTCO` sees R1 and not R2. `A-SHIFT` sees neither; R1's address shows the not-found state and its messages and attachments return no rows | |
+| DS-14 | Department account without a department | `SA` clears `A-SHIFT`'s department via the console user editor | 1. Attempt the save. 2. Force it in SQL as postgres, then sign in as `A-SHIFT` | The editor refuses to save without a department; the trigger refuses it too (`23514`). If forced, the dashboard shows *Your account has no department yet* and every scoped query returns nothing | |
+| DS-15 | Department must belong to the hospital | `A-ADMIN` | 1. Console: update own profile `department_id` to a Hospital B department | Error `23514` "The department must belong to the account's hospital." | |
+| DS-16 | Scoped notifications | Run `flag_overdue_readiness()` with ICU overdue and Theatre overdue | 1. Sign in as `A-SHIFT` and `A-ADMIN` | `A-SHIFT` receives the ICU alert only; `A-ADMIN` receives both | |
+| DS-17 | Incoming referral toast | `B-COORD` on the dashboard in a second browser; `A-COORD` raises a referral to B | Watch B's screen | A red toast with *Open referral* and *Dismiss* appears at the bottom right (top on a phone), a chime plays, and the toast stays until acted on | |
+| DS-18 | Attachments | Live referral R1 between A and B | 1. As `A-DEPTCO`, add a PNG and a PDF under Attachments. 2. As `B-COORD`, open both. 3. As `A-SHIFT`, try `supabase.from('referral_attachments').select('*')` | Files upload with a PHI reminder shown; B opens them in a new tab; the uploader can remove their own; `A-SHIFT` gets no rows; the audit log shows `referral.attach` | |
+| DS-19 | Awaiting-response call button | A pending referral older than 15 minutes | 1. Open it as either side | The banner is amber (red after 30 minutes) and shows a red *Call now* button dialling the other facility's emergency line | |
 
 ---
 

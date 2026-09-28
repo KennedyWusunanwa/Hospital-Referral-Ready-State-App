@@ -12,6 +12,7 @@ import type {
   PatientSex,
   ReadinessStatus,
   ReferralOutcome,
+  ReferralPolicy,
   ReferralStatus,
   ResourceKey,
   ShiftType,
@@ -32,7 +33,10 @@ export type {
 // Core entities
 // ---------------------------------------------------------------------------
 
-export type Hospital = Omit<Tables<'hospitals'>, 'level'> & { level: HospitalLevel }
+export type Hospital = Omit<Tables<'hospitals'>, 'level' | 'referral_policy'> & {
+  level: HospitalLevel
+  referral_policy: ReferralPolicy
+}
 
 export type Department = Omit<Tables<'departments'>, 'template_key'> & {
   template_key: DepartmentTemplateKey
@@ -73,6 +77,12 @@ export type ReferralEvent = Tables<'referral_events'>
 
 export type Message = Tables<'messages'>
 
+export type ReferralAttachment = Tables<'referral_attachments'>
+
+export interface ReferralAttachmentWithUploader extends ReferralAttachment {
+  uploader: Pick<Profile, 'id' | 'full_name'> | null
+}
+
 export type AppNotification = Omit<Tables<'notifications'>, 'type'> & { type: NotificationType }
 
 export type AuditLog = Tables<'audit_logs'>
@@ -92,6 +102,8 @@ export interface ReferralWithRelations extends Referral {
     'id' | 'name' | 'code' | 'phone' | 'emergency_phone' | 'city' | 'region' | 'logo_url'
   > | null
   emergency_type: Pick<EmergencyType, 'id' | 'name' | 'code' | 'category'> | null
+  /** The department the referral was raised from, when the requester had one. */
+  origin_department: Pick<Department, 'id' | 'name'> | null
   requested_by_profile: Pick<Profile, 'id' | 'full_name' | 'phone'> | null
   responded_by_profile: Pick<Profile, 'id' | 'full_name' | 'phone'> | null
 }

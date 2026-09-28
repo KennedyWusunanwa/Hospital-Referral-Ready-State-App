@@ -10,7 +10,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ClipboardList, PencilLine, Search, ShieldAlert } from 'lucide-react'
-import { Gate } from '@/auth/RequireAuth'
+import { ScopeGate } from '@/auth/RequireAuth'
 import {
   Badge,
   Button,
@@ -30,6 +30,7 @@ import {
   type DepartmentTemplateKey,
   type ReadinessStatus,
 } from '@/lib/constants'
+import { canSubmitReadinessFor } from '@/lib/scope'
 import type { DepartmentReadiness } from '@/lib/types'
 import { cn, relativeTime } from '@/lib/utils'
 import { READINESS_COLOR_CLASSES } from '@/domain/readiness'
@@ -121,7 +122,14 @@ export function DepartmentRow({
         )}
       </div>
 
-      <Gate capability="readiness:submit">
+      <ScopeGate
+        allow={(scope) =>
+          canSubmitReadinessFor(scope, {
+            id: department.department_id,
+            hospital_id: department.hospital_id,
+          })
+        }
+      >
         <div className="shrink-0">
           <Link
             to={`/readiness/${department.department_id}`}
@@ -137,7 +145,7 @@ export function DepartmentRow({
             <span className="sr-only">for {department.department_name}</span>
           </Link>
         </div>
-      </Gate>
+      </ScopeGate>
     </div>
   )
 }

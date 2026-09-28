@@ -44,17 +44,20 @@ number. See [docs/SECURITY.md](docs/SECURITY.md).
 
 ### Access levels
 
-People are managed at three levels, which group the five database roles:
+People are managed at three levels, which group the six database roles:
 
 | Level | Roles | Scope |
 | --- | --- | --- |
 | **System** | System Administrator | The whole platform: hospitals, accounts, catalogue, scoring, branding, audit, sign-ins. Developers and the programme office. |
-| **Hospital** | Hospital Administrator, Referral Coordinator, Viewer | One facility: its settings, staff, referrals and reports. |
-| **Department** | Shift In-Charge | One department in one facility: files the readiness update every shift. |
+| **Hospital** | Hospital Administrator, Referral Coordinator, Viewer | One facility: its settings, staff, every department's readiness, the referrals it sends and receives, its reports. |
+| **Department** | Shift In-Charge, Department Coordinator | One department in one facility: sees only that department, files its readiness update every shift. A Department Coordinator may also raise referrals from it where the hospital allows. |
 
-The levels change nothing in row-level security; they are how invitations, filters and labels are
-organised. The current public origin is **https://hospital-ref.vercel.app** until the national
-domain is in place.
+The levels are enforced by row-level security (migration `0008_department_scope.sql`): a
+department-level account cannot read another department's readiness or submit for it, and each
+hospital chooses which levels may raise referrals (**Referral initiation** under Administration:
+hospital only, departments only, or both). See [docs/DEPARTMENT_SCOPE.md](docs/DEPARTMENT_SCOPE.md).
+The current public origin is **https://hospital-ref.vercel.app** until the national domain is in
+place.
 
 Explicitly **not** in this release: push/SMS notifications, biometric login, offline mode and
 HIS/EMR integration. See [SPECIFICATION.md](docs/SPECIFICATION.md) section 8.
@@ -198,6 +201,7 @@ area. Components never call `supabase` directly except for one-line audit writes
 | --- | --- |
 | [docs/SPECIFICATION.md](docs/SPECIFICATION.md) | The 14 contract points: features, roles, workflows, the scoring formula with a worked example, database, security, reporting, integrations, web/mobile, hosting, backups, acceptance tests, performance, delivery |
 | [docs/SECURITY.md](docs/SECURITY.md) | Authentication, access control and RLS, encryption, secure coding, backups, vulnerability management, logging, credential handling, threat model, PHI and data minimisation |
+| [docs/DEPARTMENT_SCOPE.md](docs/DEPARTMENT_SCOPE.md) | Department scoping: the System → Hospital → Department model, the scope helpers on both sides, the referral initiation policy, the security review, tests, deployment steps and the decisions still open |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Supabase project setup, migrations, auth configuration, first admin, seeding, Vercel, custom domain, the scheduled overdue-readiness job, backup/restore, rollback, smoke tests |
 | [docs/ACCEPTANCE_TESTS.md](docs/ACCEPTANCE_TESTS.md) | 64 numbered manual test cases with a client sign-off block |
 | [docs/API.md](docs/API.md) | Every RPC — arguments, returns, callers, errors, examples — plus the PostgREST endpoints and realtime channels the client uses |

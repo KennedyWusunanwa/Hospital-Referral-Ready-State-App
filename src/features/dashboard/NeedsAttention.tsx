@@ -20,6 +20,7 @@ import {
   type UrgencyLevel,
 } from '@/lib/constants'
 import type { DepartmentReadiness, ReferralWithRelations } from '@/lib/types'
+import { canSubmitReadinessFor, type UserScope } from '@/lib/scope'
 import { cn } from '@/lib/utils'
 import { useDepartmentReadiness } from '@/features/readiness/useReadiness'
 import { useReferrals } from '@/features/referrals/useReferrals'
@@ -99,11 +100,12 @@ function outgoingItem(referral: ReferralWithRelations, now: Date): AttentionItem
   }
 }
 
-function departmentItem(
-  department: DepartmentReadiness,
-  canSubmit: boolean,
-): AttentionItem {
+function departmentItem(department: DepartmentReadiness, scope: UserScope): AttentionItem {
   const stale = department.status === 'red'
+  const canSubmit = canSubmitReadinessFor(scope, {
+    id: department.department_id,
+    hospital_id: department.hospital_id,
+  })
   return {
     id: `department-${department.department_id}`,
     rank: stale ? 2 : 4,
@@ -154,12 +156,13 @@ function AttentionRow({ item }: { item: AttentionItem }) {
 
 export interface NeedsAttentionProps {
   hospitalId: string | null
+  /** Restrict the readiness items to these departments (department-level accounts). */
+  departmentIds?: readonly string[] | null
   now: Date
 }
 
-export function NeedsAttention({ hospitalId, now }: NeedsAttentionProps) {
-  const { can } = useAuth()
-  const canSubmit = can('readiness:submit')
+export function NeedsAttention({ hospitalId, departmentIds = null, now }: NeedsAttentionProps) {
+  const { scope } = useAuth()
 
   // Same filter shape as the referral list page, so the two share one fetch.
   const pending = useReferrals({ hospitalId, direction: 'all', status: ['pending'] })
@@ -179,11 +182,12 @@ export function NeedsAttention({ hospitalId, now }: NeedsAttentionProps) {
     for (const department of readiness.data ?? []) {
       if (!department.requires_shift_update) continue
       if (department.status === 'green') continue
-      collected.push(departmentItem(department, canSubmit))
+      if (departmentIds && !departmentIds.includes(department.department_id)) continue
+      collected.push(departmentItem(department, scope))
     }
 
     return collected.sort((a, b) => a.rank - b.rank || a.weight - b.weight)
-  }, [pending.data, readiness.data, hospitalId, now, canSubmit])
+  }, [pending.data, readiness.data, hospitalId, departmentIds, now, scope])
 
   if (!hospitalId) return null
 

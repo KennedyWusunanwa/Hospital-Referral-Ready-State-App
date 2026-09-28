@@ -57,6 +57,7 @@ export const ROLE_TONES: Record<UserRole, 'brand' | 'info' | 'success' | 'warnin
   super_admin: 'warning',
   hospital_admin: 'brand',
   shift_in_charge: 'info',
+  department_coordinator: 'info',
   referral_coordinator: 'success',
   viewer: 'neutral',
 }
@@ -104,8 +105,15 @@ function EditStaffModal({
   const roleOptions = (Object.keys(ROLE_LABELS) as UserRole[]).filter(
     (option) => option !== 'super_admin' || canGrantSuperAdmin || member.role === 'super_admin',
   )
+  // A department-level account without a department has no scope at all; the
+  // database refuses the same change, this keeps the refusal out of a toast.
+  const needsDepartment = ROLE_TIER_OF[role] === 'department' && !departmentId
 
   const save = async () => {
+    if (needsDepartment) {
+      toast.error('Choose the department this person reports for.')
+      return
+    }
     try {
       await updateStaff.mutateAsync({
         userId: member.id,
@@ -133,7 +141,11 @@ function EditStaffModal({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button loading={updateStaff.isPending} onClick={() => void save()}>
+          <Button
+            loading={updateStaff.isPending}
+            disabled={needsDepartment}
+            onClick={() => void save()}
+          >
             Save changes
           </Button>
         </>
@@ -187,11 +199,13 @@ function EditStaffModal({
 
         <Field
           label="Department"
+          required={ROLE_TIER_OF[role] === 'department'}
           hint={
             ROLE_TIER_OF[role] === 'department'
-              ? 'A shift in-charge files readiness for exactly one department.'
+              ? 'A department-level account sees and files readiness for this one department only.'
               : 'Optional. Sets which readiness form the person lands on.'
           }
+          error={needsDepartment ? 'Required for a department-level role.' : undefined}
         >
           {({ id, describedBy }) => (
             <Select
@@ -274,7 +288,7 @@ export function InvitePanel({
       return
     }
     if (needsDepartment) {
-      toast.error('A shift in-charge needs a department to report for.')
+      toast.error('A department-level account needs a department to report for.')
       return
     }
     try {
@@ -401,7 +415,7 @@ export function InvitePanel({
               required={tier === 'department'}
               hint={
                 tier === 'department'
-                  ? 'The one department this person reports readiness for.'
+                  ? 'The one department this person sees and reports readiness for.'
                   : 'Optional for hospital-level roles.'
               }
             >

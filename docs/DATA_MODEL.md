@@ -199,6 +199,8 @@ The facility register. Every other table is scoped by it, directly or transitive
 | `timezone` | `text` | no | `'Africa/Accra'` | IANA zone. All shift arithmetic for this facility uses it |
 | `is_active` | `boolean` | no | `true` | Deactivate rather than delete; referral history must keep resolving |
 | `accepts_referrals` | `boolean` | no | `true` | A standing "do not send" flag, distinct from the shift-by-shift diversion flag |
+| `referral_policy` | `text` | no | `'hospital_only'` | Which levels may raise a referral from here: `hospital_only`, `department_only`, `hospital_and_department` (0008). Checked by `can_create_referral()` |
+| `logo_url` | `text` | yes | — | Public URL of the facility logo (0006) |
 | `notes` | `text` | yes | — | Free-text operational notes |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `updated_at` | `timestamptz` | no | `now()` | Trigger-maintained |
@@ -246,22 +248,25 @@ with no hospital when the metadata is missing or malformed.
 | `full_name` | `text` | no | `''` | Display name, shown on timelines and chat |
 | `email` | `text` | no | `''` | Copied from the auth record for display and audit |
 | `phone` | `text` | yes | — | Work contact |
-| `role` | `text` | no | `'viewer'` | One of five roles. **Changing it is trigger-guarded** |
+| `role` | `text` | no | `'viewer'` | One of six roles. **Changing it is trigger-guarded** |
 | `hospital_id` | `uuid` | yes | — | → `hospitals.id`, `on delete set null`. Null only for `super_admin`; every other role needs one or scoped policies return nothing |
-| `department_id` | `uuid` | yes | — | → `departments.id`. Steers which readiness form the user lands on. Deliberately self-editable — it grants nothing |
+| `department_id` | `uuid` | yes | — | → `departments.id`. For department-level roles this **is** the account's scope: required, must belong to `hospital_id`, and trigger-guarded like `role` (0008). For hospital-level roles it only steers which readiness form the person lands on |
 | `is_active` | `boolean` | no | `true` | **False revokes all access instantly**: `current_user_role()` and `current_user_hospital()` filter on it, so a live JWT resolves to no role and every scoped policy fails closed |
 | `must_change_password` | `boolean` | no | `false` | Set when an admin issues a credential; cleared when the user sets their own |
 | `last_login_at` | `timestamptz` | yes | — | Stamped by `record_login()` |
 | `created_at` / `updated_at` | `timestamptz` | no | `now()` | |
 
-**Constraints** — `role` restricted to the five roles.
+**Constraints** — `role` restricted to the six roles. A department, when set, must belong to the
+account's hospital (trigger-checked on insert and update); a department-level role must have one.
 
 **Security notes.** There is no INSERT policy (only the auth trigger creates profiles) and no DELETE
 policy (deactivate, never delete, so the audit trail keeps pointing at a real person). The
-`guard_profile_privileges` `BEFORE UPDATE` trigger rejects any change to `role`, `hospital_id` or
-`is_active` unless the caller is a `super_admin`, or a `hospital_admin` acting within their own
-hospital on a non-super-admin role. A `WITH CHECK` clause cannot see the old row, which is precisely
-why this has to be a trigger.
+`guard_profile_privileges` `BEFORE UPDATE` trigger rejects any change to `role`, `hospital_id`,
+`is_active`, or `department_id` where a department-level role is involved, unless the caller is a
+`super_admin`, or a `hospital_admin` acting within their own hospital on a non-super-admin role. A
+`WITH CHECK` clause cannot see the old row, which is precisely why this has to be a trigger.
+Visibility is scoped too: a department-level account sees itself, its department's colleagues and
+the hospital's administrators and coordinators, not the whole staff list.
 
 ---
 
@@ -421,6 +426,7 @@ ever be added. See [SECURITY.md](SECURITY.md) section 8.
 | `reference_number` | `text` | no | trigger | `FERN-YYYYMMDD-NNNN`, unique. Assigned by `assign_referral_reference()` |
 | `requesting_hospital_id` | `uuid` | no | — | → `hospitals.id`, `on delete restrict`. Set from the caller's profile, never from a client argument |
 | `receiving_hospital_id` | `uuid` | yes | — | → `hospitals.id`, `on delete set null` |
+| `origin_department_id` | `uuid` | yes | — | → `departments.id`, `on delete set null`. The requester's department when the referral was raised (0008). Null for hospital-level requesters without one. Keys department-level visibility |
 | `emergency_type_id` | `uuid` | no | — | → `emergency_types.id`, `on delete restrict` |
 | `urgency` | `text` | no | `'urgent'` | `critical` \| `urgent` \| `routine`. Also selects the assumed transport speed |
 | `status` | `text` | no | `'pending'` | The lifecycle state — see enumerations |
@@ -676,6 +682,38 @@ Visibility: a person sees their own rows; a `hospital_admin` sees their facility
 `ensure_hospital_defaults()` trigger, which gives a newly created hospital its
 `hospital_resources` row and eight `blood_stock` rows immediately.
 
+---
+
+## 20. `referral_attachments`
+
+Files travelling with a referral: X-rays, scans, result sheets. The row is the record; the object
+lives in the **private** `referral-attachments` storage bucket under `<referral_id>/<file>`, and is
+only ever opened through a signed URL. Added in `0008_department_scope.sql`.
+
+| Column | Type | Null | Default | Meaning |
+| --- | --- | :---: | --- | --- |
+| `id` | `uuid` | no | `gen_random_uuid()` | Primary key |
+| `referral_id` | `uuid` | no | — | → `referrals.id`, `on delete cascade` |
+| `hospital_id` | `uuid` | yes | — | → `hospitals.id`. The uploader's hospital, stamped server-side |
+| `uploaded_by` | `uuid` | yes | — | → `profiles.id`. Stamped server-side from `auth.uid()` |
+| `file_name` | `text` | no | — | Display name, 1–200 characters |
+| `content_type` | `text` | no | — | `image/jpeg`, `image/png`, `image/webp` or `application/pdf` (the bucket enforces the same list) |
+| `size_bytes` | `integer` | no | — | 1 byte to 20 MB |
+| `storage_path` | `text` | no | — | Object key in the bucket, unique |
+| `caption` | `text` | yes | — | ≤ 200 characters |
+| `created_at` | `timestamptz` | no | `now()` | |
+
+**Policies.** SELECT follows `can_view_referral(referral_id)` exactly. INSERT needs `messaging:use`,
+visibility of the referral, and a live status (`pending`, `accepted`, `in_transit`). DELETE is the
+uploader's while the referral is live, or a `super_admin`'s. The storage policies on the bucket
+apply the same rule by reading the referral id back out of the object path. Every insert writes a
+`referral.attach` audit row.
+
+**PHI.** The interface tells uploaders to crop or redact names, numbers, dates of birth and faces
+before uploading, but an image is not inspectable by a constraint: the attachment store must be
+treated as potentially identifying, kept private, and covered by the retention policy of the
+referral it belongs to.
+
 ## Indexes
 
 Every index below is there because a query the application actually issues needs it. There are no
@@ -726,8 +764,11 @@ Primary keys and unique constraints add their own indexes and are not repeated h
 Every list below is a `CHECK` constraint in `0001_schema.sql` and a `const` array in
 `src/lib/constants.ts`. They must be changed together, in one migration and one commit.
 
-**Roles** (`profiles.role`) — `super_admin`, `hospital_admin`, `shift_in_charge`,
-`referral_coordinator`, `viewer`
+**Roles** (`profiles.role`) — `super_admin`, `hospital_admin`, `referral_coordinator`, `viewer`
+(hospital level), `shift_in_charge`, `department_coordinator` (department level)
+
+**Referral policies** (`hospitals.referral_policy`) — `hospital_only`, `department_only`,
+`hospital_and_department`
 
 **Hospital levels** (`hospitals.level`) — `health_centre`, `primary`, `district`, `secondary`,
 `tertiary`, `specialist`
@@ -772,7 +813,7 @@ assumed), `urgent` (50 km/h), `routine` (40 km/h)
 **Audit actions** (`audit_logs.action`) — not constrained in SQL, but the catalogue is
 `auth.login`, `auth.logout`, `auth.failed_login`, `readiness.submit`, `referral.create`,
 `referral.accept`, `referral.decline`, `referral.in_transit`, `referral.complete`,
-`referral.cancel`, `message.send`, `hospital.create`, `hospital.update`, `department.create`,
+`referral.cancel`, `referral.attach`, `message.send`, `hospital.create`, `hospital.update`, `department.create`,
 `department.update`, `user.invite`, `user.update_role`, `user.deactivate`, `config.update`,
 `report.export`
 

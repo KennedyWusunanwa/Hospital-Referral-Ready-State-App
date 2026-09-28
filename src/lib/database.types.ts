@@ -30,6 +30,7 @@ export interface Database {
           accepts_referrals: boolean
           notes: string | null
           logo_url: string | null
+          referral_policy: string
           created_at: string
           updated_at: string
         }
@@ -52,6 +53,7 @@ export interface Database {
           accepts_referrals?: boolean
           notes?: string | null
           logo_url?: string | null
+          referral_policy?: string
         }
         Update: Partial<Database['public']['Tables']['hospitals']['Insert']>
         Relationships: []
@@ -252,6 +254,7 @@ export interface Database {
           reference_number: string
           requesting_hospital_id: string
           receiving_hospital_id: string | null
+          origin_department_id: string | null
           emergency_type_id: string
           urgency: string
           status: string
@@ -284,6 +287,7 @@ export interface Database {
           reference_number?: string
           requesting_hospital_id: string
           receiving_hospital_id?: string | null
+          origin_department_id?: string | null
           emergency_type_id: string
           urgency?: string
           status?: string
@@ -468,6 +472,34 @@ export interface Database {
         }
         Insert: Partial<Database['public']['Tables']['staff_invites']['Row']> & { email: string }
         Update: Partial<Database['public']['Tables']['staff_invites']['Row']>
+        Relationships: []
+      }
+
+      referral_attachments: {
+        Row: {
+          id: string
+          referral_id: string
+          hospital_id: string | null
+          uploaded_by: string | null
+          file_name: string
+          content_type: string
+          size_bytes: number
+          storage_path: string
+          caption: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          referral_id: string
+          hospital_id?: string | null
+          uploaded_by?: string | null
+          file_name: string
+          content_type: string
+          size_bytes: number
+          storage_path: string
+          caption?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['referral_attachments']['Insert']>
         Relationships: []
       }
 

@@ -71,29 +71,34 @@ A system administrator can re-brand the network for everyone (section 9.7): bran
 
 ## 3. Access levels and roles
 
-People are managed at three levels. The levels group the five roles the database enforces; they change nothing in what a role may do, they make invitations, filters and labels easier to reason about.
+People are managed at three levels. A role says *what* a person may do; the level says *where*. Both are enforced by the database, not only by the interface.
 
 | Level | Roles | Scope |
 | --- | --- | --- |
 | **System** | System Administrator | The whole platform: every hospital, every account, the emergency catalogue, scoring, branding, the sign-in log and the network-wide audit trail. Developers and the programme office. |
-| **Hospital** | Hospital Administrator, Referral Coordinator, Viewer | One facility: its settings, departments and staff, the referrals it sends and receives, its reports. |
-| **Department** | Shift In-Charge | One department in one facility: files the readiness update every shift and follows referrals that concern it. |
+| **Hospital** | Hospital Administrator, Referral Coordinator, Viewer | One facility: its settings, every department's readiness, its staff, the referrals it sends and receives, its reports. Hospital-level accounts also see other facilities' department boards, because choosing where to refer is a cross-hospital question. |
+| **Department** | Shift In-Charge, Department Coordinator | One department in one facility: sees and files readiness for that department only, follows the referrals raised from it, and is never shown the rest of the building. A Department Coordinator may also raise referrals from the department where the hospital's **Referral initiation** setting allows (section 9.1). |
+
+A department-level account must have a department. One without a department sees a warning on every page and can act on nothing until an administrator assigns one.
 
 ### 3.1 What each role can do
 
-| Capability | System Admin | Hospital Admin | Referral Coordinator | Shift In-Charge | Viewer |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| See readiness boards and the hospital directory | Yes | Yes | Yes | Yes | Yes |
-| Submit a department's shift readiness update | Yes | Yes | – | Yes | – |
-| See referrals involving the hospital | Yes | Yes | Yes | Yes | Yes |
-| Raise a referral | Yes | Yes | Yes | – | – |
-| Accept, decline, move and complete referrals | Yes | Yes | Yes | – | – |
-| Chat on a live referral | Yes | Yes | Yes | Yes | – |
-| Reports for the hospital | Yes | Yes | Yes | – | Yes |
-| Reports for every hospital | Yes | – | – | – | – |
-| Administer the hospital (settings, departments, staff) | Yes | Yes | – | – | – |
-| Read the audit log | Yes (network) | Yes (hospital) | – | – | – |
-| System console | Yes | – | – | – | – |
+| Capability | System Admin | Hospital Admin | Referral Coordinator | Department Coordinator | Shift In-Charge | Viewer |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| See readiness boards and the hospital directory | Yes | Yes | Yes | Own department | Own department | Yes |
+| Submit a department's shift readiness update | Yes | Yes | – | Own department | Own department | – |
+| See referrals involving the hospital | Yes | Yes | Yes | Own department's | Own department's | Yes |
+| Raise a referral | Yes | Yes\* | Yes\* | Yes\* | – | – |
+| Accept, decline, move and complete referrals | Yes | Yes | Yes | – | – | – |
+| Chat on a live referral | Yes | Yes | Yes | Yes | Yes | – |
+| Attach imaging and results to a live referral | Yes | Yes | Yes | Yes | Yes | – |
+| Reports for the hospital | Yes | Yes | Yes | – | – | Yes |
+| Reports for every hospital | Yes | – | – | – | – | – |
+| Administer the hospital (settings, departments, staff) | Yes | Yes | – | – | – | – |
+| Read the audit log | Yes (network) | Yes (hospital) | – | – | – | – |
+| System console | Yes | – | – | – | – | – |
+
+\* Subject to the hospital's **Referral initiation** setting: *Hospital only* (the default) lets hospital-level roles refer, *Departments only* lets Department Coordinators refer, *Hospital and departments* lets both. A role without referral rights never refers, whatever the setting.
 
 A screen a role may not open shows a plain *Not available for your role* card rather than an error. The database applies the same rules independently of the interface.
 
@@ -105,7 +110,7 @@ A screen a role may not open shows a plain *Not available for your role* card ra
 | Readiness | Everyone |
 | Referrals | Everyone |
 | Hospitals | Everyone |
-| Reports | Everyone except Shift In-Charge |
+| Reports | Hospital-level and system accounts |
 | Administration | Hospital Administrators, and System Administrators who are attached to a hospital |
 | System console | System Administrators |
 
@@ -141,7 +146,7 @@ Arrow keys move, *Enter* opens, *Esc* closes. The palette remembers the last six
 
 ### 4.4 Notifications and toasts
 
-Arrivals that need a person (an incoming referral, an acceptance or decline, a new message, an overdue department) appear as a toast in the top right for five seconds with a *View* link, and remain in **Notifications** until read. Critical toasts are red, warnings amber.
+Arrivals that need a person (an incoming referral, an acceptance or decline, a new message, an overdue department) appear as a toast with a *View* link and remain in **Notifications** until read. On a desktop the toasts sit at the bottom right; on a phone they drop in from the top, because the tab bar owns the bottom edge. Ordinary toasts last six seconds and critical ones twelve. An **incoming referral** is different: its toast stays on screen until it is opened (*Open referral*) or dismissed, and it plays a short two-tone chime, as does any critical alert. The speaker button beside the theme switch in the sidebar mutes the chime on that device. Notifications follow scope: a department-level account is alerted about its own department's readiness and about messages on referrals raised from its department, not about the rest of the hospital.
 
 ### 4.5 Loading, empty and error states
 
@@ -163,7 +168,7 @@ Path `/`. Every sign-in lands here. It is ordered by what the person has to do, 
 
 1. **Greeting** with the person's first name (honorifics stripped), the hospital and role, the current shift and how long is left in it, and the hospital's traffic light chip.
 2. **Needs attention**: up to six items, most urgent first, each with a button: incoming referrals waiting past the 15-minute response target, departments three or more shifts stale, then referrals sent and unanswered and departments one or two shifts overdue. The band disappears entirely when nothing is outstanding.
-3. **Need to move a patient?** with *New referral* (for roles that can raise one), beside **Your shift update** for a Shift In-Charge (their department's light, who last reported and when, *Submit readiness update* or *Amend this shift*) or **Readiness still owing** for other submitters (the departments not yet reported this shift).
+3. **Need to move a patient?** with *New referral* (for roles the hospital's referral initiation setting lets raise one), beside **Your shift update** for an account with a department of its own (that department's light, who last reported and when, *Submit readiness update* or *Amend this shift*) or **Readiness still owing** for other submitters (the departments not yet reported this shift).
 4. **Five tiles**: departments current, awaiting our response (with how many are past target), sent and awaiting reply, completed in seven days, average response time in seven days.
 5. **Department readiness**, the compact board (section 6.2) with *Open board*.
 6. **Referral trend, last 7 days**: a chart of referrals raised, accepted and completed per day.
@@ -174,6 +179,18 @@ Path `/`. Every sign-in lands here. It is ordered by what the person has to do, 
 A System Administrator with no home hospital sees instead: a card linking to the **System console**; **Network overview** tiles (active hospitals and how many accept referrals, referrals in seven days and acceptance rate, pending network-wide, average response); **Lowest readiness compliance, last 7 days** listing the six hospitals missing the most shift updates with a meter each; and the network-wide referral trend.
 
 An account attached to no hospital and without network rights sees a warning explaining that an administrator has to attach it before anything can be shown.
+
+### 5.3 For a department-level account
+
+A Shift In-Charge or Department Coordinator lands on a dashboard built around their own department and nothing else:
+
+1. **Greeting** naming the hospital, the department and the role, with the shift chip.
+2. **Needs attention**, limited to the department's own readiness and to the referrals raised from it.
+3. **Your shift update** (the department's light, last report, *Submit readiness update* or *Amend this shift*) beside **Need to move a patient?** when the hospital lets departments refer; otherwise a short note saying who raises referrals at this hospital.
+4. **Four tiles**: the department's status, when it last reported and by whom, referrals from the department awaiting a reply, referrals completed in seven days.
+5. **Recent submissions** for the department (seven days) and **Referrals from your department**.
+
+No hospital-wide figures appear, and none can be reached by address: the database returns only the department's rows to this account. An account whose department has not been set sees a warning instead of the panels.
 
 ---
 
@@ -188,7 +205,7 @@ An account attached to no hospital and without network rights sees a warning exp
 
 ### 6.2 Departmental readiness board
 
-Path `/readiness`. For a hospital account.
+Path `/readiness`. For a hospital-level account (a department-level account sees section 6.5 at the same address).
 
 - Header with the hospital name, the timezone shifts are shown in, and a chip with the current shift and time remaining.
 - Four tiles: reported this shift, overdue, stale, compliance (percentage of reporting departments that are current).
@@ -197,7 +214,7 @@ Path `/readiness`. For a hospital account.
 
 ### 6.3 Shift readiness update form
 
-Path `/readiness/<department>`. For roles that can submit.
+Path `/readiness/<department>`. For roles that can submit, and only for a department in scope: a department-level account may open its own department's form, a hospital-level account any department of its own hospital. Anything else shows a *Not your department* card, and the database refuses the submission independently.
 
 - The header names the department and the shift being filed, and says whether this shift has already been reported (in which case the form amends it).
 - Fields are decided by the department's **template** (Emergency, Main Theatre, ICU, NICU, Maternity, Surgery, Radiology, Blood Bank, Renal, Cardiology, Burns, General Ward). Counts have a capacity companion (for example ICU beds free of total), yes/no resources are switches, oxygen is a percentage. The Blood Bank template also collects units per blood group; the Emergency template also sets the hospital-wide *Emergency unit open / on diversion* flag with a reason.
@@ -209,6 +226,10 @@ Path `/readiness/<department>`. For roles that can submit.
 Path `/readiness` for a System Administrator with no home hospital.
 
 Four tiles (hospitals; fully current; overdue; stale, with the share of all departments current), a filter bar (search across hospitals and departments, region, level, readiness chips) and one card per hospital, worst first: logo, name, status badge, "n/m current", a coloured strip with one segment per department, the departments still owing with how long ago they last reported, and *Open hospital*.
+
+### 6.5 Department readiness view
+
+Path `/readiness` for a department-level account. The header names the department; below it **Your shift update** (light, last report, the submit or amend button), **Recent submissions** over fourteen days, and a note that the hospital-wide board is a hospital-level view. There are no hospital tiles and no list of other departments.
 
 ---
 
@@ -242,7 +263,9 @@ Path `/referrals/<id>`.
 
 - Header: reference number, status and urgency, the two hospitals with logos, and the action buttons for the viewer's side of the transfer.
 - **Status machine**: Pending → Accepted or Declined; Accepted → In transit; In transit → Completed; Pending or Accepted → Cancelled by the referring hospital. Only the buttons the database will accept from this viewer are offered. *Complete* asks for an outcome (transferred and received, stabilised at referring facility, referred elsewhere, died before transfer, declined by patient or family, other) and notes.
-- **Case** panel: emergency, urgency, age band, sex, summary, required resources, patient code.
+- While a referral is **pending**, an *Awaiting response* banner counts the minutes. Past the 15-minute target it turns amber, past 30 minutes red, and from the target onwards it carries a red **Call now** button dialling the other facility's emergency line, so the phone call is one tap from the notice. *Cancel referral* is a red button; the *Call* button on the chat panel is red too, because it dials the emergency line.
+- **Case** panel: emergency, urgency, age band, sex, summary, required resources, patient code, who requested it and from which department.
+- **Attachments**: X-rays, scans and result sheets (JPEG, PNG, WebP or PDF, up to 20 MB each). Either facility can add files while the referral is live, everyone who can see the referral can open them (through a short-lived private link), and whoever uploaded a file can remove it. The panel repeats the rule that applies to the whole referral: no patient names, numbers, dates of birth or faces. Every upload is written to the audit log.
 - **Ranking at the time**: the chosen hospital's score with its breakdown, and the alternatives considered.
 - **Contact**: emergency and switchboard numbers with call links, the requesting and responding staff.
 - **Timeline**: every status change with who, when and any note; immutable.
@@ -285,11 +308,11 @@ Path `/hospitals/<id>`.
 
 Path `/admin`, for Hospital Administrators (and System Administrators attached to a facility). Tabs: **Hospital**, **Departments**, **Staff**, **Audit log**. System Administrators also see a card pointing to the console for network-wide settings.
 
-**Hospital.** Facility details (name, short code, level, timezone, address, town, region with the sixteen Ghanaian regions offered as suggestions, country, switchboard and emergency phones, email, notes), the **logo** (upload a PNG, SVG, JPEG or WebP under 1 MB, paste an https link, or remove it to fall back to the monogram), the **location** with a link that opens the pinned position in OpenStreetMap so it can be checked against the compound, and a separate **Referral availability** switch. Turning referrals off asks for confirmation and removes the hospital from every ranking immediately.
+**Hospital.** Facility details (name, short code, level, timezone, address, town, region with the sixteen Ghanaian regions offered as suggestions, country, switchboard and emergency phones, email, notes), **Referral initiation** (who may raise referrals from this hospital: *Hospital only*, the default; *Departments only*; or *Hospital and departments*, each explained in place, with a warning when hospital-level roles are about to lose the button), the **logo** (upload a PNG, SVG, JPEG or WebP under 1 MB, paste an https link, or remove it to fall back to the monogram), the **location** with a link that opens the pinned position in OpenStreetMap so it can be checked against the compound, and a separate **Referral availability** switch. Turning referrals off asks for confirmation and removes the hospital from every ranking immediately.
 
 **Departments.** The list with search, a template filter and *Show retired*; *New department* and *Edit* open a form with the name, the template (with a live summary of the readiness fields it brings), a contact phone and the *Requires a readiness update every shift* switch. Departments are retired, never deleted, so readiness history survives; a retired department can be restored.
 
-**Staff.** Search (name, email, phone), an *Active / Deactivated / All* switch, role and department filters and level chips with counts; staff are grouped by level. Each row: initials, name, level · role badge, email, department, last sign-in, and *Edit* (role, department) or *Deactivate* / *Reactivate*. Nobody can change their own role or deactivate themselves. Below it, **Invite a colleague**: pick the level first, then the role, name, email and department (required at Department level), then *Create invitation*; pending invitations list with *Revoke*.
+**Staff.** Search (name, email, phone), an *Active / Deactivated / All* switch, role and department filters and level chips with counts; staff are grouped by level. Each row: initials, name, level · role badge, email, department, last sign-in, and *Edit* (role, department) or *Deactivate* / *Reactivate*. Nobody can change their own role or deactivate themselves. A department-level role cannot be saved without a department, in this form or in the console: the database refuses it as well. Below it, **Invite a colleague**: pick the level first, then the role, name, email and department (required at Department level), then *Create invitation*; pending invitations list with *Revoke*.
 
 **Audit log.** Every readiness submission, referral decision and administrative change for the facility, filterable by date, action, entity type and actor email, expandable to the recorded detail, exportable to CSV.
 

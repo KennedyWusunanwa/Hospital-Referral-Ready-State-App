@@ -39,6 +39,7 @@ import {
   type Capability,
 } from '@/lib/constants'
 import { useInstallPrompt } from '@/lib/installPrompt'
+import { canCreateReferral, canSubmitReadinessFor, type UserScope } from '@/lib/scope'
 import { useTheme } from '@/lib/theme'
 import { matchRank, matchesQuery } from '@/lib/textMatch'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -72,6 +73,8 @@ interface PageEntry {
   keywords: string
   capability?: Capability
   requiresHospital?: boolean
+  /** A scope test, for pages where capability alone is not the answer. */
+  allow?: (scope: UserScope) => boolean
 }
 
 const PAGES: PageEntry[] = [
@@ -99,7 +102,7 @@ const PAGES: PageEntry[] = [
     to: '/referrals/new',
     icon: <Plus className="h-4 w-4" aria-hidden />,
     keywords: 'refer transfer patient send',
-    capability: 'referral:create',
+    allow: canCreateReferral,
     requiresHospital: true,
   },
   {
@@ -243,7 +246,7 @@ export interface GlobalSearchResult {
 
 /** `revision` bumps when the recent list changes, so an empty query re-reads it. */
 export function useGlobalSearch(term: string, open: boolean, revision = 0): GlobalSearchResult {
-  const { can, hospital, signOut } = useAuth()
+  const { can, hospital, scope, signOut } = useAuth()
   const { theme, toggle } = useTheme()
   const installPrompt = useInstallPrompt()
   const query = term.trim()
@@ -272,6 +275,7 @@ export function useGlobalSearch(term: string, open: boolean, revision = 0): Glob
     const pages = PAGES.filter(
       (page) =>
         (!page.capability || can(page.capability)) &&
+        (!page.allow || page.allow(scope)) &&
         (!page.requiresHospital || Boolean(hospital)) &&
         matchesQuery(`${page.title} ${page.subtitle} ${page.keywords}`, query),
     )
@@ -333,13 +337,13 @@ export function useGlobalSearch(term: string, open: boolean, revision = 0): Glob
       if (units.length > 0) {
         result.push({
           key: 'departments',
-          label: 'Your departments',
+          label: scope.level === 'department' ? 'Your department' : 'Your departments',
           items: units.map((row) => ({
             id: `department:${row.id}`,
             title: row.name,
             subtitle: DEPARTMENT_TEMPLATES[row.template_key]?.label ?? 'Department',
             icon: <ClipboardCheck className="h-4 w-4" aria-hidden />,
-            to: can('readiness:submit') ? `/readiness/${row.id}` : '/readiness',
+            to: canSubmitReadinessFor(scope, row) ? `/readiness/${row.id}` : '/readiness',
           })),
         })
       }
@@ -423,6 +427,7 @@ export function useGlobalSearch(term: string, open: boolean, revision = 0): Glob
   }, [
     query,
     can,
+    scope,
     hospital,
     hospitals.data,
     departments.data,

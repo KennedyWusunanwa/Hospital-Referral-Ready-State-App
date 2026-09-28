@@ -39,7 +39,7 @@ function dismissedRecently(): boolean {
 function Banner({ children }: { children: ReactNode }) {
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-50 p-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:inset-x-auto md:right-4 md:bottom-4 md:w-96 md:p-0 md:pb-0 no-print"
+      className="fixed inset-x-0 bottom-0 z-50 p-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] md:inset-x-auto md:left-4 md:bottom-4 md:w-96 md:p-0 md:pb-0 lg:left-[17rem] no-print"
       role="region"
       aria-label="App notice"
     >

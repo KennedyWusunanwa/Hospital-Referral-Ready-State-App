@@ -19,6 +19,8 @@ import {
   Settings,
   ShieldCheck,
   Sun,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthProvider'
@@ -36,6 +38,7 @@ import { ROLE_LABELS, ROLE_TIER_LABELS, ROLE_TIER_OF, type Capability } from '@/
 import { useBranding } from '@/features/branding/useBranding'
 import { HospitalLogo } from '@/features/hospitals/HospitalLogo'
 import { CommandPalette, isApplePlatform } from '@/features/search/CommandPalette'
+import { playAlertChime, useAlertSound } from '@/lib/alertSound'
 import { useInstallPrompt } from '@/lib/installPrompt'
 import { useTheme, type ThemePreference } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -372,6 +375,28 @@ function InstallButton() {
   )
 }
 
+/** Per-device switch for the chime that accompanies incoming referrals and critical alerts. */
+function SoundSwitch() {
+  const { enabled, setEnabled } = useAlertSound()
+  return (
+    <IconButton
+      label={enabled ? 'Mute alert sounds' : 'Unmute alert sounds'}
+      aria-pressed={enabled}
+      onClick={() => {
+        setEnabled(!enabled)
+        if (!enabled) playAlertChime('incoming')
+      }}
+      className="h-9 w-9 min-h-0 min-w-0"
+    >
+      {enabled ? (
+        <Volume2 className="h-4 w-4" aria-hidden />
+      ) : (
+        <VolumeX className="h-4 w-4" aria-hidden />
+      )}
+    </IconButton>
+  )
+}
+
 function SidebarFooter() {
   const { profile, role, signOut } = useAuth()
   const tier = role ? ROLE_TIER_LABELS[ROLE_TIER_OF[role]] : null
@@ -392,6 +417,7 @@ function SidebarFooter() {
       <InstallButton />
       <div className="mt-1 flex items-center gap-1.5">
         <ThemeSwitch />
+        <SoundSwitch />
         <IconButton
           label="Sign out"
           onClick={() => void signOut()}

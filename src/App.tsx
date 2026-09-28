@@ -1,7 +1,13 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { RequireAuth, RedirectIfAuthenticated, RequireCapability } from '@/auth/RequireAuth'
+import {
+  RequireAuth,
+  RedirectIfAuthenticated,
+  RequireCapability,
+  RequireDepartmentAccess,
+  RequireReferralCreate,
+} from '@/auth/RequireAuth'
 import { SplashScreen } from '@/components/brand/SplashScreen'
 import { Card, Spinner } from '@/components/ui'
 import {
@@ -117,9 +123,11 @@ export default function App() {
             path="readiness/:departmentId"
             element={
               <RequireCapability capability="readiness:submit">
-                <Screen fallback={<FormPageSkeleton />}>
-                  <ReadinessUpdatePage />
-                </Screen>
+                <RequireDepartmentAccess>
+                  <Screen fallback={<FormPageSkeleton />}>
+                    <ReadinessUpdatePage />
+                  </Screen>
+                </RequireDepartmentAccess>
               </RequireCapability>
             }
           />
@@ -137,11 +145,11 @@ export default function App() {
           <Route
             path="referrals/new"
             element={
-              <RequireCapability capability="referral:create">
+              <RequireReferralCreate>
                 <Screen fallback={<FormPageSkeleton steps />}>
                   <NewReferralPage />
                 </Screen>
-              </RequireCapability>
+              </RequireReferralCreate>
             }
           />
           <Route

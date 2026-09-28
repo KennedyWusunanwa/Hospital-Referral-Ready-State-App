@@ -79,10 +79,16 @@ function EditUserModal({
 
   const tier = ROLE_TIER_OF[role]
   const hospitalDepartments = departments.filter((d) => d.hospital_id === hospitalId)
+  const departmentValid = hospitalDepartments.some((d) => d.id === departmentId)
+  const needsDepartment = tier === 'department' && !departmentValid
 
   const save = async () => {
     if (tier !== 'system' && !hospitalId) {
       toast.error(`A ${ROLE_LABELS[role]} must belong to a hospital.`)
+      return
+    }
+    if (needsDepartment) {
+      toast.error(`A ${ROLE_LABELS[role]} needs a department at that hospital.`)
       return
     }
     try {
@@ -93,9 +99,7 @@ function EditUserModal({
           full_name: fullName.trim() || member.full_name,
           role: isSelf ? undefined : role,
           hospital_id: tier === 'system' ? hospitalId || null : hospitalId,
-          department_id: hospitalDepartments.some((d) => d.id === departmentId)
-            ? departmentId
-            : null,
+          department_id: departmentValid ? departmentId : null,
           is_active: isSelf ? undefined : active,
         },
       })
@@ -117,7 +121,7 @@ function EditUserModal({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button loading={update.isPending} onClick={() => void save()}>
+          <Button loading={update.isPending} disabled={needsDepartment} onClick={() => void save()}>
             Save changes
           </Button>
         </>
@@ -197,18 +201,23 @@ function EditUserModal({
             required={tier === 'department'}
             hint={
               tier === 'department'
-                ? 'The one department this person reports readiness for.'
+                ? 'The one department this person sees and reports readiness for.'
                 : 'Optional.'
+            }
+            error={
+              needsDepartment && hospitalId ? 'Required for a department-level role.' : undefined
             }
           >
             {({ id }) => (
               <Select
                 id={id}
-                value={departmentId}
+                value={departmentValid ? departmentId : ''}
                 disabled={!hospitalId}
                 onChange={(event) => setDepartmentId(event.target.value)}
               >
-                <option value="">No department</option>
+                <option value="">
+                  {tier === 'department' ? 'Choose a department' : 'No department'}
+                </option>
                 {hospitalDepartments.map((department) => (
                   <option key={department.id} value={department.id}>
                     {department.name}
@@ -371,7 +380,11 @@ export default function ConsoleUsers() {
           value={tierCounts.hospital}
           sublabel="Administrators, coordinators, viewers"
         />
-        <Stat label="Department level" value={tierCounts.department} sublabel="Shift in-charges" />
+        <Stat
+          label="Department level"
+          value={tierCounts.department}
+          sublabel="Shift in-charges and department coordinators"
+        />
         <Stat
           label="Need attention"
           value={neverSignedIn + unattached}

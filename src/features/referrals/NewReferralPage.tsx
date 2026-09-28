@@ -892,6 +892,14 @@ export default function NewReferralPage() {
         </div>
       )}
 
+      {step === 3 && selected && (
+        <Alert tone="info" title="Imaging and results">
+          X-rays, scans and result sheets are attached on the referral page once the request is
+          sent, so the receiving team can open them alongside the case. Remove patient identifiers
+          before uploading.
+        </Alert>
+      )}
+
       {step === 3 && !selected && (
         <Alert tone="warning" title="No hospital selected">
           The hospital you chose is no longer available. Go back and pick another.

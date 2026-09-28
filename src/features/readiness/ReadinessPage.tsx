@@ -24,6 +24,7 @@ import { formatPercent } from '@/lib/utils'
 import { complianceRate } from '@/domain/readiness'
 import { formatDuration } from '@/domain/geo'
 import { getShiftAt, minutesLeftInShift } from '@/domain/shifts'
+import { DepartmentReadinessPage } from './DepartmentReadinessPage'
 import { NetworkReadinessBoard } from './NetworkReadinessBoard'
 import { ReadinessBoard } from './ReadinessBoard'
 import { useHospitalReadiness, useNowTick } from './useReadiness'
@@ -35,10 +36,11 @@ function shiftName(type: string): string {
 }
 
 export default function ReadinessPage() {
-  const { hospital, timezone, can } = useAuth()
+  const { hospital, timezone, can, scope } = useAuth()
   const hospitalId = useCurrentHospitalId()
   const now = useNowTick()
-  const summaryQuery = useHospitalReadiness(hospitalId)
+  const departmentLevel = scope.level === 'department'
+  const summaryQuery = useHospitalReadiness(departmentLevel ? null : hospitalId)
 
   const shift = getShiftAt(now, timezone)
   const remaining = minutesLeftInShift(now, timezone)
@@ -52,6 +54,10 @@ export default function ReadinessPage() {
       {shiftName(shift.shiftType)} shift - {formatDuration(remaining)} remaining
     </Badge>
   )
+
+  if (departmentLevel) {
+    return <DepartmentReadinessPage shiftChip={shiftChip} />
+  }
 
   if (!hospitalId && can('admin:system')) {
     return (

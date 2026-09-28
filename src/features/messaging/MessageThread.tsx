@@ -118,7 +118,7 @@ export function MessageThread({
         description={
           counterpartName ? `Direct line to ${counterpartName}` : 'Direct line between both teams'
         }
-        action={<CallLink phone={counterpartPhone} label="Call" />}
+        action={<CallLink phone={counterpartPhone} label="Call" emergency />}
       />
 
       <div className="relative">

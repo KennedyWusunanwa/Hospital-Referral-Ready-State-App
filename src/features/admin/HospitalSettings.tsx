@@ -52,6 +52,7 @@ export default function HospitalSettings() {
         longitude: values.longitude,
         notes: values.notes || null,
         logo_url: values.logo_url,
+        referral_policy: values.referral_policy,
       })
       await refreshProfile()
       toast.success('Hospital details saved')

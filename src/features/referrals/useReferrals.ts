@@ -51,6 +51,9 @@ const REFERRAL_SELECT: string = `
   emergency_type:emergency_types!referrals_emergency_type_id_fkey (
     id, name, code, category
   ),
+  origin_department:departments!referrals_origin_department_id_fkey (
+    id, name
+  ),
   requested_by_profile:profiles!referrals_requested_by_fkey (
     id, full_name, phone
   ),

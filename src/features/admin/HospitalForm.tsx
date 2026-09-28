@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { ExternalLink, ImageIcon, Link2, MapPin, Trash2, Upload } from 'lucide-react'
+import { ExternalLink, ImageIcon, Link2, MapPin, Send, Trash2, Upload } from 'lucide-react'
 import {
   Alert,
   Badge,
@@ -29,6 +29,9 @@ import {
   GHANA_REGIONS,
   HOSPITAL_LEVELS,
   HOSPITAL_LEVEL_LABELS,
+  REFERRAL_POLICIES,
+  REFERRAL_POLICY_DESCRIPTIONS,
+  REFERRAL_POLICY_LABELS,
   type HospitalLevel,
 } from '@/lib/constants'
 import type { Hospital } from '@/lib/types'
@@ -94,6 +97,7 @@ const schema = z
     notes: optionalText(1000),
     is_active: z.boolean(),
     accepts_referrals: z.boolean(),
+    referral_policy: z.enum(REFERRAL_POLICIES),
   })
   .superRefine((values, ctx) => {
     if (!isValidLatLng({ latitude: values.latitude, longitude: values.longitude })) {
@@ -125,6 +129,7 @@ function defaultsFor(hospital: Hospital | null): z.infer<typeof schema> {
     notes: hospital?.notes ?? '',
     is_active: hospital?.is_active ?? true,
     accepts_referrals: hospital?.accepts_referrals ?? true,
+    referral_policy: hospital?.referral_policy ?? 'hospital_only',
   }
 }
 
@@ -279,6 +284,7 @@ export function HospitalForm({
   const code = watch('code')
   const isActive = watch('is_active')
   const acceptsReferrals = watch('accepts_referrals')
+  const referralPolicy = watch('referral_policy')
   const coordinatesUsable = isValidLatLng({ latitude, longitude })
   const logoDirty = (hospital?.logo_url ?? null) !== logoUrl
 
@@ -451,6 +457,37 @@ export function HospitalForm({
               />
             )}
           </Field>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Referral initiation"
+          description="Which levels of staff may raise a referral from this hospital. Roles without referral rights are never included, whatever is chosen here."
+          action={<Send className="h-5 w-5 text-slate-300 dark:text-slate-600" aria-hidden />}
+        />
+        <CardBody className="space-y-3">
+          <Field label="Who may raise referrals" required>
+            {({ id, describedBy }) => (
+              <Select id={id} aria-describedby={describedBy} {...form.register('referral_policy')}>
+                {REFERRAL_POLICIES.map((policy) => (
+                  <option key={policy} value={policy}>
+                    {REFERRAL_POLICY_LABELS[policy]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+            {REFERRAL_POLICY_DESCRIPTIONS[referralPolicy]}
+          </p>
+          {referralPolicy === 'department_only' && (
+            <Alert tone="warning">
+              Hospital Administrators and Referral Coordinators at this hospital will lose the New
+              referral button. They keep every other referral function, including answering incoming
+              requests.
+            </Alert>
+          )}
         </CardBody>
       </Card>
 

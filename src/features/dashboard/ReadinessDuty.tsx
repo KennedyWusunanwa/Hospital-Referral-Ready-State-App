@@ -159,21 +159,18 @@ function OwingList({ departments, now }: { departments: DepartmentReadiness[]; n
 
 export interface ReadinessDutyProps {
   hospitalId: string | null
-  /** The signed-in user's own department, when they have one. */
-  departmentId: string | null
+  /** The signed-in user's own departments, when they have any. Usually one. */
+  departmentIds: readonly string[]
   minutesLeft: number
   now: Date
 }
 
-export function ReadinessDuty({ hospitalId, departmentId, minutesLeft, now }: ReadinessDutyProps) {
+export function ReadinessDuty({ hospitalId, departmentIds, minutesLeft, now }: ReadinessDutyProps) {
   const query = useDepartmentReadiness(hospitalId)
 
   const mine = useMemo(
-    () =>
-      departmentId
-        ? ((query.data ?? []).find((row) => row.department_id === departmentId) ?? null)
-        : null,
-    [query.data, departmentId],
+    () => (query.data ?? []).filter((row) => departmentIds.includes(row.department_id)),
+    [query.data, departmentIds],
   )
 
   const owing = useMemo(
@@ -187,9 +184,15 @@ export function ReadinessDuty({ hospitalId, departmentId, minutesLeft, now }: Re
   return (
     <Card>
       <CardHeader
-        title={mine ? 'Your shift update' : 'Readiness still owing'}
+        title={
+          mine.length > 1
+            ? 'Your shift updates'
+            : mine.length === 1
+              ? 'Your shift update'
+              : 'Readiness still owing'
+        }
         description={
-          mine
+          mine.length > 0
             ? 'One update per department, per shift.'
             : 'Departments that have not reported for the current shift.'
         }
@@ -199,8 +202,17 @@ export function ReadinessDuty({ hospitalId, departmentId, minutesLeft, now }: Re
           <LoadingBlock label="Loading your readiness duty" rows={2} />
         ) : query.isError ? (
           <ErrorBlock error={query.error} onRetry={() => void query.refetch()} />
-        ) : mine ? (
-          <MyDepartment department={mine} minutesLeft={minutesLeft} now={now} />
+        ) : mine.length > 0 ? (
+          <div className="space-y-3">
+            {mine.map((department) => (
+              <MyDepartment
+                key={department.department_id}
+                department={department}
+                minutesLeft={minutesLeft}
+                now={now}
+              />
+            ))}
+          </div>
         ) : owing.length === 0 ? (
           <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/40">
             <ClipboardList

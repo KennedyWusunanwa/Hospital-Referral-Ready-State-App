@@ -14,6 +14,7 @@ export const USER_ROLES = [
   'super_admin',
   'hospital_admin',
   'shift_in_charge',
+  'department_coordinator',
   'referral_coordinator',
   'viewer',
 ] as const
@@ -24,6 +25,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'System Administrator',
   hospital_admin: 'Hospital Administrator',
   shift_in_charge: 'Shift In-Charge',
+  department_coordinator: 'Department Coordinator',
   referral_coordinator: 'Referral Coordinator',
   viewer: 'Viewer',
 }
@@ -31,7 +33,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: 'Full access across every hospital, including configuration and user management.',
   hospital_admin: 'Manages their own hospital: departments, staff, readiness compliance, reports.',
-  shift_in_charge: 'Submits departmental readiness updates for each shift.',
+  shift_in_charge: 'Submits readiness updates for their own department each shift.',
+  department_coordinator:
+    'Runs one department: files its readiness each shift and, where the hospital allows departments to refer, raises referrals from it.',
   referral_coordinator: 'Raises referral requests and responds to incoming referrals.',
   viewer: 'Read-only access to dashboards and reports for their hospital.',
 }
@@ -63,6 +67,13 @@ export const ROLE_CAPABILITIES = {
     'audit:view',
   ],
   shift_in_charge: ['readiness:submit', 'readiness:view', 'referral:view', 'messaging:use'],
+  department_coordinator: [
+    'readiness:submit',
+    'readiness:view',
+    'referral:create',
+    'referral:view',
+    'messaging:use',
+  ],
   referral_coordinator: [
     'readiness:view',
     'referral:create',
@@ -94,12 +105,13 @@ export const ROLE_TIER_OF: Record<UserRole, RoleTier> = {
   referral_coordinator: 'hospital',
   viewer: 'hospital',
   shift_in_charge: 'department',
+  department_coordinator: 'department',
 }
 
 export const ROLES_BY_TIER: Record<RoleTier, readonly UserRole[]> = {
   system: ['super_admin'],
   hospital: ['hospital_admin', 'referral_coordinator', 'viewer'],
-  department: ['shift_in_charge'],
+  department: ['shift_in_charge', 'department_coordinator'],
 }
 
 export const ROLE_TIER_LABELS: Record<RoleTier, string> = {
@@ -114,7 +126,7 @@ export const ROLE_TIER_DESCRIPTIONS: Record<RoleTier, string> = {
   hospital:
     'Scoped to one facility: its settings, departments and staff, the referrals it sends and receives, and its reports.',
   department:
-    'Scoped to one department in one facility: files the readiness update every shift and follows referrals that concern it.',
+    'Scoped to one department in one facility: files its readiness update every shift, sees only that department, and raises referrals from it only where the hospital allows.',
 }
 
 /** Short label for a role, prefixed with its tier: "Hospital · Administrator". */
@@ -502,6 +514,38 @@ export const DEPARTMENT_TEMPLATES: Record<DepartmentTemplateKey, DepartmentTempl
 }
 
 // ---------------------------------------------------------------------------
+// Referral initiation policy -- a hospital-level setting layered on top of the
+// role capabilities. A role without referral:create never refers, whatever the
+// policy says; a role with it refers only from the levels the policy names.
+// Mirrored in SQL by referral_policy_allows() (0008_department_scope.sql).
+// ---------------------------------------------------------------------------
+
+export const REFERRAL_POLICIES = [
+  'hospital_only',
+  'department_only',
+  'hospital_and_department',
+] as const
+export type ReferralPolicy = (typeof REFERRAL_POLICIES)[number]
+
+/** Matches how every hospital behaved before the setting existed. */
+export const DEFAULT_REFERRAL_POLICY: ReferralPolicy = 'hospital_only'
+
+export const REFERRAL_POLICY_LABELS: Record<ReferralPolicy, string> = {
+  hospital_only: 'Hospital only',
+  department_only: 'Departments only',
+  hospital_and_department: 'Hospital and departments',
+}
+
+export const REFERRAL_POLICY_DESCRIPTIONS: Record<ReferralPolicy, string> = {
+  hospital_only:
+    'Only hospital-level roles (Hospital Administrator, Referral Coordinator) raise referrals. Department accounts follow the referrals that concern them.',
+  department_only:
+    'Only Department Coordinators raise referrals, each from their own department. Hospital-level roles keep oversight and answer incoming requests.',
+  hospital_and_department:
+    'Hospital-level roles and Department Coordinators may all raise referrals.',
+}
+
+// ---------------------------------------------------------------------------
 // Referral lifecycle
 // ---------------------------------------------------------------------------
 
@@ -693,6 +737,7 @@ export const AUDIT_ACTIONS = [
   'referral.complete',
   'referral.cancel',
   'message.send',
+  'referral.attach',
   'hospital.create',
   'hospital.update',
   'department.create',

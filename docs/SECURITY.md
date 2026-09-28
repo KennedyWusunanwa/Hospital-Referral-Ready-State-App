@@ -57,9 +57,12 @@ These are dashboard settings, not code, and are listed in DEPLOYMENT.md as requi
 
 Authorisation has two layers, and only one of them is load-bearing.
 
-**Layer 1 — the UI capability matrix.** `ROLE_CAPABILITIES` in `src/lib/constants.ts` maps each of
-the five roles to a set of eleven capabilities; `can(role, capability)` and the `RequireCapability`
-route guard use it to decide what to render. This is an *affordance* layer: it stops a viewer from
+**Layer 1 — the UI capability matrix and scope.** `ROLE_CAPABILITIES` in `src/lib/constants.ts`
+maps each of the six roles to a set of eleven capabilities; `can(role, capability)` and the
+`RequireCapability` route guard use it to decide what to render. `src/lib/scope.ts` adds *where*:
+`canAccessDepartment`, `canSubmitReadinessFor` and `canCreateReferral` combine the role with the
+account's hospital, department(s) and the hospital's referral policy, and the `RequireDepartmentAccess`
+and `RequireReferralCreate` guards apply them to routes. This is an *affordance* layer: it stops a viewer from
 being shown a button they cannot use. It is client-side code and is assumed to be bypassable.
 
 **Layer 2 — row-level security.** RLS is enabled on every table in `public`, and default privileges
@@ -102,8 +105,11 @@ Because these functions bypass RLS, they are deliberately minimal and follow thr
 2. **`search_path` is pinned** to `public, pg_temp`, so a caller who has set a hostile `search_path`
    cannot substitute their own `profiles` table underneath the function.
 3. **They return facts, not data.** `current_user_role()`, `current_user_hospital()`,
-   `is_super_admin()`, `is_admin()`, `has_capability(text)` and `is_referral_participant(uuid)`
-   return a role name, a UUID or a boolean — never rows a caller could not otherwise read.
+   `current_user_level()`, `is_super_admin()`, `is_admin()`, `has_capability(text)`,
+   `accessible_department_ids()`, `can_view_department(uuid)`, `can_manage_department(uuid)`,
+   `can_view_referral(uuid)` (which `is_referral_participant(uuid)` now aliases),
+   `referral_policy_allows(text, uuid)` and `can_create_referral()` return a role name, a level, a
+   UUID or an array of them, or a boolean — never rows a caller could not otherwise read.
 
 The same pattern carries the write RPCs (`submit_readiness`, `create_referral`,
 `update_referral_status`, `flag_overdue_readiness`, `log_audit_event`, `mark_notifications_read`).
@@ -124,11 +130,17 @@ A `WITH CHECK` expression cannot see the old row, so it cannot distinguish "this
 from "this user just promoted themselves". The guard is therefore a `BEFORE UPDATE` trigger,
 `guard_profile_privileges()`, which compares old and new and raises SQLSTATE `42501` unless:
 
-- nothing privileged changed (`role`, `hospital_id`, `is_active` all identical — `department_id` is
-  intentionally self-editable, since it only steers which readiness form a user lands on); or
+- nothing privileged changed (`role`, `hospital_id`, `is_active` all identical, and `department_id`
+  identical where either the old or the new role is department-level — since 0008 the department
+  *is* such an account's scope, so it is guarded like the role; for hospital-level roles it only
+  steers which readiness form the user lands on and stays self-editable); or
 - the caller is a `super_admin`; or
 - the caller is a `hospital_admin` and both the old and new `hospital_id` are their own hospital and
   the new role is not `super_admin`.
+
+The same trigger refuses a department-level role without a department and any department outside
+the account's own hospital, so an administrator cannot create an account whose scope is undefined or
+crosses facilities.
 
 Profiles are never deleted, only deactivated, so the audit trail keeps pointing at a real person.
 
@@ -136,11 +148,12 @@ Profiles are never deleted, only deactivated, so the audit trail keeps pointing 
 
 | Data | Who can read it |
 | --- | --- |
-| Hospitals, departments, resources, blood stock, readiness updates | Every authenticated user. Ranking a referral is inherently a cross-hospital query, and readiness is the network-wide signal the product exists to publish |
-| Referrals and their timelines | The requesting hospital, the receiving hospital, and `super_admin`. Nobody else, ever |
-| Messages and read receipts | The two participating hospitals only, via `is_referral_participant()` |
-| Notifications | The addressed user only (`user_id = auth.uid()`) |
-| Profiles | Yourself, colleagues at your own hospital, and `super_admin` |
+| Hospitals, resources, blood stock | Every authenticated user. Ranking a referral is inherently a cross-hospital query |
+| Departments and readiness updates | System- and hospital-level accounts: every hospital's. Department-level accounts: their own department only (`can_view_department()`), so the `department_readiness` view, the boards and the history return nothing else to them |
+| Referrals and their timelines | Hospital level: the requesting hospital, the receiving hospital. Department level: referrals raised from the account's department or by the account. `super_admin`: all. Nobody else, ever (`can_view_referral()`) |
+| Messages, read receipts and attachments | Exactly the people who can see the referral, via `can_view_referral()`; the attachment bucket applies the same test to the object path |
+| Notifications | The addressed user only (`user_id = auth.uid()`). Fan-out follows scope: overdue-readiness alerts go to the hospital's administrators and to that department's own accounts; message alerts go to the other side's referral desk and, on the requesting side, to the requester and the origin department |
+| Profiles | Yourself, `super_admin`, and colleagues at your own hospital — all of them for hospital-level accounts; for department-level accounts only the same department plus the hospital's administrators and coordinators |
 | Audit logs | `super_admin` across the network; `hospital_admin` for their own hospital's rows only |
 | `referral_reference_counters` | Nobody. All privileges revoked from both client roles |
 
